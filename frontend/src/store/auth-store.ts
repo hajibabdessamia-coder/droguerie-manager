@@ -1,0 +1,31 @@
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+import type { AuthUser } from '@/types';
+
+interface AuthState {
+  user: AuthUser | null;
+  accessToken: string | null;
+  hasHydrated: boolean;
+  login: (user: AuthUser, accessToken: string) => void;
+  logout: () => void;
+  setHasHydrated: (state: boolean) => void;
+}
+
+export const useAuthStore = create<AuthState>()(
+  persist(
+    (set) => ({
+      user: null,
+      accessToken: null,
+      hasHydrated: false,
+      login: (user, accessToken) => set({ user, accessToken }),
+      logout: () => set({ user: null, accessToken: null }),
+      setHasHydrated: (state) => set({ hasHydrated: state }),
+    }),
+    {
+      name: 'pharma-auth',
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
+    },
+  ),
+);

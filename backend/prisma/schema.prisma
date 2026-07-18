@@ -1,0 +1,362 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL") // رابط Supabase المجمّع (pooler) للتشغيل العادي
+  directUrl = env("DIRECT_URL")   // رابط Supabase المباشر، يُستخدم فقط أثناء الترحيل (migrate)
+}
+
+// ============================================================
+// المستخدمون والصلاحيات
+// ============================================================
+
+enum Role {
+  ADMIN  // صلاحية كاملة
+  SELLER // بيع فقط، لا حذف، لا تعديل أسعار إلا بإذن
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         Role     @default(SELLER)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  sales      Sale[]
+  purchases  Purchase[]
+  auditLogs  AuditLog[]
+  priceOverridesGranted PriceOverrideGrant[] @relation("GrantedBy")
+
+  @@map("users")
+}
+
+// إذن مؤقت من المدير للبائع بتعديل سعر منتج معين ضمن عملية بيع محددة
+model PriceOverrideGrant {
+  id        String   @id @default(cuid())
+  saleId    String
+  sale      Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  grantedBy String
+  grantedByUser User @relation("GrantedBy", fields: [grantedBy], references: [id])
+  createdAt DateTime @default(now())
+
+  @@map("price_override_grants")
+}
+
+// ============================================================
+// المنتجات
+// ============================================================
+
+model Manufacturer {
+  id       String    @id @default(cuid())
+  name     String    @unique
+  products Product[]
+
+  @@map("manufacturers")
+}
+
+// تصنيف ثابت لتنظيم منتجات نقطة البيع في 4 تبويبات فقط
+enum ProductGroup {
+  GROUP_1
+  GROUP_2
+  GROUP_3
+  GROUP_4
+}
+
+model Product {
+  id               String    @id @default(cuid())
+  name             String
+  imageUrl         String?
+  internalCode     String    @unique
+  group            ProductGroup  @default(GROUP_1)
+  manufacturerId   String?
+  manufacturer     Manufacturer? @relation(fields: [manufacturerId], references: [id])
+
+  purchasePrice    Decimal   @db.Decimal(10, 2)
+  retailPrice      Decimal   @db.Decimal(10, 2) // سعر التقسيط
+  wholesalePrice   Decimal   @db.Decimal(10, 2) // سعر الجملة
+
+  quantity         Int       @default(0)
+  minStock         Int       @default(0)
+  notes            String?
+
+  isActive         Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  saleItems        SaleItem[]
+  purchaseItems    PurchaseItem[]
+  stockMovements   StockMovement[]
+
+  @@index([name])
+  @@map("products")
+}
+
+// سجل كل حركة مخزون (بيع، شراء، تصحيح يدوي) لتفسير أي تغيير في الكمية
+enum StockMovementType {
+  SALE
+  PURCHASE
+  ADJUSTMENT
+}
+
+model StockMovement {
+  id        String            @id @default(cuid())
+  productId String
+  product   Product           @relation(fields: [productId], references: [id])
+  type      StockMovementType
+  quantity  Int               // موجب أو سالب حسب الاتجاه
+  reason    String?
+  createdAt DateTime          @default(now())
+
+  @@map("stock_movements")
+}
+
+// ============================================================
+// الزبائن والموردون
+// ============================================================
+
+enum CustomerType {
+  WHOLESALE // جملة
+  RETAIL    // تقسيط
+}
+
+model Customer {
+  id        String       @id @default(cuid())
+  name      String
+  phone     String?
+  address   String?
+  type      CustomerType @default(RETAIL)
+  balance   Decimal      @default(0) @db.Decimal(10, 2) // موجب = دين على الزبون
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  sales    Sale[]
+  payments CustomerPayment[]
+
+  @@index([name])
+  @@map("customers")
+}
+
+model CustomerPayment {
+  id         String   @id @default(cuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+  amount     Decimal  @db.Decimal(10, 2)
+  note       String?
+  createdAt  DateTime @default(now())
+
+  @@map("customer_payments")
+}
+
+model Supplier {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String?
+  address   String?
+  balance   Decimal  @default(0) @db.Decimal(10, 2) // موجب = دين على المحل للمورد
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  purchases Purchase[]
+  payments  SupplierPayment[]
+
+  @@index([name])
+  @@map("suppliers")
+}
+
+model SupplierPayment {
+  id         String   @id @default(cuid())
+  supplierId String
+  supplier   Supplier @relation(fields: [supplierId], references: [id])
+  amount     Decimal  @db.Decimal(10, 2)
+  note       String?
+  createdAt  DateTime @default(now())
+
+  @@map("supplier_payments")
+}
+
+// ============================================================
+// المبيعات (نقطة البيع)
+// ============================================================
+
+enum InvoiceType {
+  TICKET  // ورقة حساب بسيطة
+  LEGAL   // فاتورة قانونية
+}
+
+enum PaymentMethod {
+  CASH
+  CREDIT // على الحساب (يزيد رصيد الزبون)
+}
+
+model Sale {
+  id            String        @id @default(cuid())
+  invoiceNumber String        @unique
+  invoiceType   InvoiceType   @default(TICKET)
+
+  customerId    String?
+  customer      Customer?     @relation(fields: [customerId], references: [id])
+  sellerId      String
+  seller        User          @relation(fields: [sellerId], references: [id])
+
+  subtotal      Decimal       @db.Decimal(10, 2)
+  discount      Decimal       @default(0) @db.Decimal(10, 2)
+  taxRate       Decimal       @default(0) @db.Decimal(5, 2) // TVA %
+  taxAmount     Decimal       @default(0) @db.Decimal(10, 2)
+  total         Decimal       @db.Decimal(10, 2)
+  amountPaid    Decimal       @db.Decimal(10, 2)
+  changeDue     Decimal       @default(0) @db.Decimal(10, 2)
+  paymentMethod PaymentMethod @default(CASH)
+
+  items         SaleItem[]
+  priceOverrideGrants PriceOverrideGrant[]
+
+  createdAt     DateTime      @default(now())
+
+  @@index([createdAt])
+  @@index([invoiceNumber])
+  @@map("sales")
+}
+
+enum PriceType {
+  WHOLESALE
+  RETAIL
+  CUSTOM // سعر معدّل يدويا من طرف المدير
+}
+
+model SaleItem {
+  id         String    @id @default(cuid())
+  saleId     String
+  sale       Sale      @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  productId  String
+  product    Product   @relation(fields: [productId], references: [id])
+
+  quantity   Int
+  unitPrice  Decimal   @db.Decimal(10, 2)
+  priceType  PriceType
+  total      Decimal   @db.Decimal(10, 2)
+
+  @@map("sale_items")
+}
+
+// ============================================================
+// المشتريات
+// ============================================================
+
+model Purchase {
+  id         String   @id @default(cuid())
+  supplierId String
+  supplier   Supplier @relation(fields: [supplierId], references: [id])
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+
+  invoiceRef String?  // رقم فاتورة المورد إن وجد
+  total      Decimal  @db.Decimal(10, 2)
+  date       DateTime @default(now())
+
+  items      PurchaseItem[]
+
+  @@index([date])
+  @@map("purchases")
+}
+
+model PurchaseItem {
+  id            String   @id @default(cuid())
+  purchaseId    String
+  purchase      Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  productId     String
+  product       Product  @relation(fields: [productId], references: [id])
+
+  quantity      Int
+  purchasePrice Decimal  @db.Decimal(10, 2)
+  total         Decimal  @db.Decimal(10, 2)
+
+  @@map("purchase_items")
+}
+
+// ============================================================
+// إعدادات المحل (تُستخدم في رأس الفاتورة القانونية)
+// ============================================================
+
+model StoreSettings {
+  id       String  @id @default(cuid())
+  name     String
+  logoUrl  String?
+  address  String?
+  phone    String?
+  ifNumber String? // IF
+  ice      String? // ICE
+  rc       String? // RC
+  patente  String?
+  defaultTaxRate Decimal @default(0) @db.Decimal(5, 2)
+
+  @@map("store_settings")
+}
+
+// ============================================================
+// سجل العمليات (Audit Log)
+// ============================================================
+
+enum AuditAction {
+  LOGIN
+  CREATE
+  UPDATE
+  DELETE
+  SALE
+}
+
+model AuditLog {
+  id         String      @id @default(cuid())
+  userId     String
+  user       User        @relation(fields: [userId], references: [id])
+  action     AuditAction
+  entityType String      // مثال: "Product", "Sale"
+  entityId   String?
+  details    String?
+  createdAt  DateTime    @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ============================================================
+// النسخ الاحتياطي والتنبيهات
+// ============================================================
+
+enum BackupStatus {
+  SUCCESS
+  FAILED
+}
+
+model Backup {
+  id        String       @id @default(cuid())
+  filePath  String
+  sizeBytes Int?
+  status    BackupStatus
+  createdAt DateTime     @default(now())
+
+  @@map("backups")
+}
+
+enum AlertType {
+  LOW_STOCK
+  EXPIRY
+  BACKUP_READY
+}
+
+model Alert {
+  id        String    @id @default(cuid())
+  type      AlertType
+  message   String
+  isRead    Boolean   @default(false)
+  productId String?
+  createdAt DateTime  @default(now())
+
+  @@index([isRead])
+  @@map("alerts")
+}
