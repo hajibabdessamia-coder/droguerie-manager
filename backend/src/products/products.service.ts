@@ -21,8 +21,8 @@ export class ProductsService {
       manufacturerId: query.manufacturerId,
       ...(query.search && {
         OR: [
-          { name: { contains: query.search, mode: 'insensitive' } },
-          { internalCode: { contains: query.search, mode: 'insensitive' } },
+          { name: { contains: query.search } },
+          { internalCode: { contains: query.search } },
         ],
       }),
     };

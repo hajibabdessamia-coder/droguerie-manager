@@ -1,0 +1,76 @@
+{
+  "name": "pharma-manager-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "build:db-template": "node build-db-template.js",
+    "make:icon": "node scripts/make-icon.js",
+    "start": "electron .",
+    "dist:win": "electron-builder --win nsis portable",
+    "dist:mac": "electron-builder --mac dmg"
+  },
+  "devDependencies": {
+    "electron": "^43.1.1",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "local.pharmamanager.desktop",
+    "productName": "Pharma Manager",
+    "asar": true,
+    "directories": {
+      "output": "dist-builds",
+      "buildResources": "resources"
+    },
+    "files": [
+      "main.js",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../backend/dist",
+        "to": "backend"
+      },
+      {
+        "from": "../backend/node_modules",
+        "to": "backend/node_modules"
+      },
+      {
+        "from": "../backend/.puppeteer-cache",
+        "to": "backend/.puppeteer-cache"
+      },
+      {
+        "from": "../frontend/out",
+        "to": "frontend-out"
+      },
+      {
+        "from": "resources/db-template.sqlite",
+        "to": "db-template.sqlite"
+      },
+      {
+        "from": "resources/icon.png",
+        "to": "icon.png"
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "resources/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "icon": "resources/icon.icns",
+      "category": "public.app-category.business"
+    }
+  }
+}

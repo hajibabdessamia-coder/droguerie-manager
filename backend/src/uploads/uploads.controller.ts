@@ -1,6 +1,6 @@
 import { BadRequestException, Controller, Inject, Post, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { Role } from '@prisma/client';
+import { Role } from '../common/enums';
 import { memoryStorage } from 'multer';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { STORAGE_SERVICE, StorageService } from './storage.interface';

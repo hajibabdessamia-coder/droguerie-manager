@@ -1,0 +1,83 @@
+name: Build macOS DMG
+
+# يُشغَّل يدوياً فقط — لا يُنشر تلقائياً عند كل push. راجع تقرير المرحلة الثانية قبل
+# تفعيله: يتطلب هذا المستودع مرفوعاً على GitHub وتفعيل Actions لهذا المستودع.
+on:
+  workflow_dispatch: {}
+
+jobs:
+  build-dmg:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Generate Prisma client (includes darwin engines)
+        working-directory: backend
+        run: npx prisma generate
+
+      - name: Build backend
+        working-directory: backend
+        run: npm run build
+
+      - name: Install macOS Chromium for Puppeteer PDF generation
+        working-directory: backend
+        run: npx puppeteer browsers install chrome --path .puppeteer-cache
+
+      - name: Build production database template (admin-only, no demo data)
+        working-directory: electron
+        run: node build-db-template.js
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build static frontend export
+        working-directory: frontend
+        run: BUILD_TARGET=electron npx next build
+
+      - name: Install electron dependencies
+        working-directory: electron
+        run: npm ci
+
+      - name: Generate placeholder PNG icon
+        working-directory: electron
+        run: node scripts/make-icon.js
+
+      - name: Convert icon to .icns (native macOS iconutil)
+        working-directory: electron
+        run: |
+          set -e
+          rm -rf icon.iconset
+          mkdir icon.iconset
+          sips -z 16 16     resources/icon.png --out icon.iconset/icon_16x16.png
+          sips -z 32 32     resources/icon.png --out icon.iconset/icon_16x16@2x.png
+          sips -z 32 32     resources/icon.png --out icon.iconset/icon_32x32.png
+          sips -z 64 64     resources/icon.png --out icon.iconset/icon_32x32@2x.png
+          sips -z 128 128   resources/icon.png --out icon.iconset/icon_128x128.png
+          sips -z 256 256   resources/icon.png --out icon.iconset/icon_128x128@2x.png
+          sips -z 256 256   resources/icon.png --out icon.iconset/icon_256x256.png
+          sips -z 512 512   resources/icon.png --out icon.iconset/icon_256x256@2x.png
+          sips -z 512 512   resources/icon.png --out icon.iconset/icon_512x512.png
+          sips -z 1024 1024 resources/icon.png --out icon.iconset/icon_512x512@2x.png
+          iconutil -c icns icon.iconset -o resources/icon.icns
+          rm -rf icon.iconset
+
+      - name: Build unsigned .dmg
+        working-directory: electron
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: npx electron-builder --mac dmg
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pharma-manager-mac-dmg
+          path: electron/dist-builds/*.dmg
+          retention-days: 30

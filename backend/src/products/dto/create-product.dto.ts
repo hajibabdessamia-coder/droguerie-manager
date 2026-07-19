@@ -1,6 +1,6 @@
 import { Type } from 'class-transformer';
 import { IsEnum, IsInt, IsNumber, IsOptional, IsString, Min, MinLength } from 'class-validator';
-import { ProductGroup } from '@prisma/client';
+import { ProductGroup } from '../../common/enums';
 
 export class CreateProductDto {
   @IsString()

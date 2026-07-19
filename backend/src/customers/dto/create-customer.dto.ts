@@ -1,5 +1,5 @@
 import { IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
-import { CustomerType } from '@prisma/client';
+import { CustomerType } from '../../common/enums';
 
 export class CreateCustomerDto {
   @IsString()

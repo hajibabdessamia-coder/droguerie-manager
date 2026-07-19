@@ -1,28 +1,27 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  // native: منصة التطوير الحالية (Windows). windows/darwin/darwin-arm64: منصات تطبيق سطح
+  // المكتب المُعبّأ (Electron) — يضمن توفر محرك Prisma الصحيح داخل كل حزمة مُصدَّرة
+  binaryTargets = ["native", "windows", "darwin", "darwin-arm64"]
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL") // رابط Supabase المجمّع (pooler) للتشغيل العادي
-  directUrl = env("DIRECT_URL")   // رابط Supabase المباشر، يُستخدم فقط أثناء الترحيل (migrate)
+  provider = "sqlite"
+  url      = env("DATABASE_URL") // ملف SQLite محلي — راجع .env
 }
 
 // ============================================================
 // المستخدمون والصلاحيات
 // ============================================================
 
-enum Role {
-  ADMIN  // صلاحية كاملة
-  SELLER // بيع فقط، لا حذف، لا تعديل أسعار إلا بإذن
-}
-
+// Role: ADMIN (صلاحية كاملة) | SELLER (بيع فقط، لا حذف، لا تعديل أسعار إلا بإذن)
+// SQLite connector doesn't support Prisma enums — see src/common/enums.ts for the app-level values.
 model User {
   id           String   @id @default(cuid())
   name         String
   email        String   @unique
   passwordHash String
-  role         Role     @default(SELLER)
+  role         String   @default("SELLER")
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -59,26 +58,19 @@ model Manufacturer {
   @@map("manufacturers")
 }
 
-// تصنيف ثابت لتنظيم منتجات نقطة البيع في 4 تبويبات فقط
-enum ProductGroup {
-  GROUP_1
-  GROUP_2
-  GROUP_3
-  GROUP_4
-}
-
+// group: تصنيف ثابت لتنظيم منتجات نقطة البيع في 4 تبويبات فقط (GROUP_1..GROUP_4) — انظر src/common/enums.ts
 model Product {
   id               String    @id @default(cuid())
   name             String
   imageUrl         String?
   internalCode     String    @unique
-  group            ProductGroup  @default(GROUP_1)
+  group            String        @default("GROUP_1")
   manufacturerId   String?
   manufacturer     Manufacturer? @relation(fields: [manufacturerId], references: [id])
 
-  purchasePrice    Decimal   @db.Decimal(10, 2)
-  retailPrice      Decimal   @db.Decimal(10, 2) // سعر التقسيط
-  wholesalePrice   Decimal   @db.Decimal(10, 2) // سعر الجملة
+  purchasePrice    Decimal
+  retailPrice      Decimal // سعر التقسيط
+  wholesalePrice   Decimal // سعر الجملة
 
   quantity         Int       @default(0)
   minStock         Int       @default(0)
@@ -97,20 +89,15 @@ model Product {
 }
 
 // سجل كل حركة مخزون (بيع، شراء، تصحيح يدوي) لتفسير أي تغيير في الكمية
-enum StockMovementType {
-  SALE
-  PURCHASE
-  ADJUSTMENT
-}
-
+// type: SALE | PURCHASE | ADJUSTMENT — انظر src/common/enums.ts
 model StockMovement {
-  id        String            @id @default(cuid())
+  id        String   @id @default(cuid())
   productId String
-  product   Product           @relation(fields: [productId], references: [id])
-  type      StockMovementType
-  quantity  Int               // موجب أو سالب حسب الاتجاه
+  product   Product  @relation(fields: [productId], references: [id])
+  type      String
+  quantity  Int      // موجب أو سالب حسب الاتجاه
   reason    String?
-  createdAt DateTime          @default(now())
+  createdAt DateTime @default(now())
 
   @@map("stock_movements")
 }
@@ -119,18 +106,14 @@ model StockMovement {
 // الزبائن والموردون
 // ============================================================
 
-enum CustomerType {
-  WHOLESALE // جملة
-  RETAIL    // تقسيط
-}
-
+// type: WHOLESALE (جملة) | RETAIL (تقسيط) — انظر src/common/enums.ts
 model Customer {
-  id        String       @id @default(cuid())
+  id        String   @id @default(cuid())
   name      String
   phone     String?
   address   String?
-  type      CustomerType @default(RETAIL)
-  balance   Decimal      @default(0) @db.Decimal(10, 2) // موجب = دين على الزبون
+  type      String   @default("RETAIL")
+  balance   Decimal  @default(0) // موجب = دين على الزبون
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
 
@@ -145,7 +128,7 @@ model CustomerPayment {
   id         String   @id @default(cuid())
   customerId String
   customer   Customer @relation(fields: [customerId], references: [id])
-  amount     Decimal  @db.Decimal(10, 2)
+  amount     Decimal
   note       String?
   createdAt  DateTime @default(now())
 
@@ -157,7 +140,7 @@ model Supplier {
   name      String
   phone     String?
   address   String?
-  balance   Decimal  @default(0) @db.Decimal(10, 2) // موجب = دين على المحل للمورد
+  balance   Decimal  @default(0) // موجب = دين على المحل للمورد
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -172,7 +155,7 @@ model SupplierPayment {
   id         String   @id @default(cuid())
   supplierId String
   supplier   Supplier @relation(fields: [supplierId], references: [id])
-  amount     Decimal  @db.Decimal(10, 2)
+  amount     Decimal
   note       String?
   createdAt  DateTime @default(now())
 
@@ -183,34 +166,26 @@ model SupplierPayment {
 // المبيعات (نقطة البيع)
 // ============================================================
 
-enum InvoiceType {
-  TICKET  // ورقة حساب بسيطة
-  LEGAL   // فاتورة قانونية
-}
-
-enum PaymentMethod {
-  CASH
-  CREDIT // على الحساب (يزيد رصيد الزبون)
-}
-
+// invoiceType: TICKET (ورقة حساب بسيطة) | LEGAL (فاتورة قانونية)
+// paymentMethod: CASH | CREDIT (على الحساب، يزيد رصيد الزبون) — انظر src/common/enums.ts
 model Sale {
   id            String        @id @default(cuid())
   invoiceNumber String        @unique
-  invoiceType   InvoiceType   @default(TICKET)
+  invoiceType   String        @default("TICKET")
 
   customerId    String?
   customer      Customer?     @relation(fields: [customerId], references: [id])
   sellerId      String
   seller        User          @relation(fields: [sellerId], references: [id])
 
-  subtotal      Decimal       @db.Decimal(10, 2)
-  discount      Decimal       @default(0) @db.Decimal(10, 2)
-  taxRate       Decimal       @default(0) @db.Decimal(5, 2) // TVA %
-  taxAmount     Decimal       @default(0) @db.Decimal(10, 2)
-  total         Decimal       @db.Decimal(10, 2)
-  amountPaid    Decimal       @db.Decimal(10, 2)
-  changeDue     Decimal       @default(0) @db.Decimal(10, 2)
-  paymentMethod PaymentMethod @default(CASH)
+  subtotal      Decimal
+  discount      Decimal       @default(0)
+  taxRate       Decimal       @default(0) // TVA %
+  taxAmount     Decimal       @default(0)
+  total         Decimal
+  amountPaid    Decimal
+  changeDue     Decimal       @default(0)
+  paymentMethod String        @default("CASH")
 
   items         SaleItem[]
   priceOverrideGrants PriceOverrideGrant[]
@@ -222,12 +197,7 @@ model Sale {
   @@map("sales")
 }
 
-enum PriceType {
-  WHOLESALE
-  RETAIL
-  CUSTOM // سعر معدّل يدويا من طرف المدير
-}
-
+// priceType: WHOLESALE | RETAIL | CUSTOM (سعر معدّل يدويا من طرف المدير) — انظر src/common/enums.ts
 model SaleItem {
   id         String    @id @default(cuid())
   saleId     String
@@ -236,9 +206,9 @@ model SaleItem {
   product    Product   @relation(fields: [productId], references: [id])
 
   quantity   Int
-  unitPrice  Decimal   @db.Decimal(10, 2)
-  priceType  PriceType
-  total      Decimal   @db.Decimal(10, 2)
+  unitPrice  Decimal
+  priceType  String
+  total      Decimal
 
   @@map("sale_items")
 }
@@ -255,7 +225,7 @@ model Purchase {
   user       User     @relation(fields: [userId], references: [id])
 
   invoiceRef String?  // رقم فاتورة المورد إن وجد
-  total      Decimal  @db.Decimal(10, 2)
+  total      Decimal
   date       DateTime @default(now())
 
   items      PurchaseItem[]
@@ -272,8 +242,8 @@ model PurchaseItem {
   product       Product  @relation(fields: [productId], references: [id])
 
   quantity      Int
-  purchasePrice Decimal  @db.Decimal(10, 2)
-  total         Decimal  @db.Decimal(10, 2)
+  purchasePrice Decimal
+  total         Decimal
 
   @@map("purchase_items")
 }
@@ -292,7 +262,7 @@ model StoreSettings {
   ice      String? // ICE
   rc       String? // RC
   patente  String?
-  defaultTaxRate Decimal @default(0) @db.Decimal(5, 2)
+  defaultTaxRate Decimal @default(0)
 
   @@map("store_settings")
 }
@@ -301,23 +271,16 @@ model StoreSettings {
 // سجل العمليات (Audit Log)
 // ============================================================
 
-enum AuditAction {
-  LOGIN
-  CREATE
-  UPDATE
-  DELETE
-  SALE
-}
-
+// action: LOGIN | CREATE | UPDATE | DELETE | SALE — انظر src/common/enums.ts
 model AuditLog {
-  id         String      @id @default(cuid())
+  id         String   @id @default(cuid())
   userId     String
-  user       User        @relation(fields: [userId], references: [id])
-  action     AuditAction
-  entityType String      // مثال: "Product", "Sale"
+  user       User     @relation(fields: [userId], references: [id])
+  action     String
+  entityType String   // مثال: "Product", "Sale"
   entityId   String?
   details    String?
-  createdAt  DateTime    @default(now())
+  createdAt  DateTime @default(now())
 
   @@index([userId])
   @@index([createdAt])
@@ -328,34 +291,25 @@ model AuditLog {
 // النسخ الاحتياطي والتنبيهات
 // ============================================================
 
-enum BackupStatus {
-  SUCCESS
-  FAILED
-}
-
+// status: SUCCESS | FAILED — انظر src/common/enums.ts
 model Backup {
-  id        String       @id @default(cuid())
+  id        String   @id @default(cuid())
   filePath  String
   sizeBytes Int?
-  status    BackupStatus
-  createdAt DateTime     @default(now())
+  status    String
+  createdAt DateTime @default(now())
 
   @@map("backups")
 }
 
-enum AlertType {
-  LOW_STOCK
-  EXPIRY
-  BACKUP_READY
-}
-
+// type: LOW_STOCK | EXPIRY | BACKUP_READY — انظر src/common/enums.ts
 model Alert {
-  id        String    @id @default(cuid())
-  type      AlertType
+  id        String   @id @default(cuid())
+  type      String
   message   String
-  isRead    Boolean   @default(false)
+  isRead    Boolean  @default(false)
   productId String?
-  createdAt DateTime  @default(now())
+  createdAt DateTime @default(now())
 
   @@index([isRead])
   @@map("alerts")

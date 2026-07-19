@@ -5,3 +5,6 @@ dist
 uploads/*
 !uploads/.gitkeep
 Reports/
+prisma/*.db
+prisma/*.db-journal
+.puppeteer-cache

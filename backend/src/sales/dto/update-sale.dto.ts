@@ -1,6 +1,6 @@
 import { Type } from 'class-transformer';
 import { IsEnum, IsNumber, IsOptional, Min } from 'class-validator';
-import { InvoiceType, PaymentMethod } from '@prisma/client';
+import { InvoiceType, PaymentMethod } from '../../common/enums';
 
 // تعديل محدود لفاتورة بيع سابقة: لا يلمس المنتجات أو الكميات أو المخزون إطلاقاً
 export class UpdateSaleDto {

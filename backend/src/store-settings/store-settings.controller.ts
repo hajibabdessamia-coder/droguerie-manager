@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Patch } from '@nestjs/common';
-import { Role } from '@prisma/client';
+import { Role } from '../common/enums';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UpdateStoreSettingsDto } from './dto/update-store-settings.dto';
 import { StoreSettingsService } from './store-settings.service';

@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
-import { Role } from '@prisma/client';
+import { Role } from '../common/enums';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { AddPaymentDto } from './dto/add-payment.dto';
 import { CreateCustomerDto } from './dto/create-customer.dto';

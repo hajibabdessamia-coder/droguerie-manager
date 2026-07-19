@@ -1,5 +1,5 @@
 import { IsEnum, IsOptional, IsString } from 'class-validator';
-import { ProductGroup } from '@prisma/client';
+import { ProductGroup } from '../../common/enums';
 
 export class QueryProductDto {
   @IsOptional()

@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
-import { Role } from '@prisma/client';
+import { Role } from '../common/enums';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { ManufacturersService } from './manufacturers.service';
 import { ManufacturerDto } from './dto/manufacturer.dto';

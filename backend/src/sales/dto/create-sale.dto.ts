@@ -1,6 +1,6 @@
 import { Type } from 'class-transformer';
 import { ArrayMinSize, IsArray, IsEnum, IsNumber, IsOptional, IsString, Min, ValidateNested } from 'class-validator';
-import { InvoiceType, PaymentMethod, PriceType } from '@prisma/client';
+import { InvoiceType, PaymentMethod, PriceType } from '../../common/enums';
 
 class SaleItemDto {
   @IsString()

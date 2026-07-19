@@ -14,7 +14,7 @@ export class CustomersService {
 
   findAll(search?: string) {
     return this.prisma.customer.findMany({
-      where: search ? { name: { contains: search, mode: 'insensitive' } } : undefined,
+      where: search ? { name: { contains: search } } : undefined,
       orderBy: { name: 'asc' },
     });
   }

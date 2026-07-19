@@ -96,7 +96,7 @@ export class SalesService {
         await tx.customer.update({ where: { id: dto.customerId }, data: { balance: { increment: total } } });
       }
 
-      await this.audit.log(sellerId, 'SALE', 'Sale', sale.id, `فاتورة ${sale.invoiceNumber} بقيمة ${total}`);
+      await this.audit.log(sellerId, 'SALE', 'Sale', sale.id, `فاتورة ${sale.invoiceNumber} بقيمة ${total}`, tx);
 
       return sale;
     });
