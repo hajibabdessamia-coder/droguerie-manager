@@ -7,19 +7,37 @@
 // destructive to the working tree, so it's always paired with a matching
 // `npm install` in `finally`, even if packaging itself fails.
 const { execSync } = require('child_process');
+const fs = require('fs');
 const path = require('path');
 
 const backendDir = path.join(__dirname, '..', '..', 'backend');
 const electronDir = path.join(__dirname, '..');
+const certPath = path.join(electronDir, 'resources', 'dev-signing-cert.pfx');
 
-function run(cmd, cwd) {
+// راجع scripts/make-dev-cert.ps1: توقيع الملف التنفيذي — حتى بشهادة ذاتية التوقيع
+// غير موثوقة الجذر — ضروري فعلياً على هذا الجهاز، وليس تحسيناً اختيارياً: سياسة
+// Windows Code Integrity (Smart App Control) ترفض تشغيل الملف التنفيذي غير
+// الموقَّع تماماً بخطأ "did not meet the Enterprise signing level requirements"،
+// مؤكَّد بإعادة إنتاج العطل وحله فعلياً على هذا الجهاز. بدون هذه الشهادة، يفشل
+// البناء بصمت لناحية التوقيع فقط (electron-builder يتخطى التوقيع إن لم يجدها)
+// لذا فشل الشرط أدناه بشكل صريح بدل شحن ملف قد لا يعمل على هذا الجهاز مجدداً.
+if (!fs.existsSync(certPath)) {
+  console.error(`Signing certificate not found at ${certPath}`);
+  console.error('Run: powershell -ExecutionPolicy Bypass -File scripts/make-dev-cert.ps1');
+  process.exit(1);
+}
+
+function run(cmd, cwd, extraEnv) {
   console.log(`$ ${cmd}`);
-  execSync(cmd, { cwd, stdio: 'inherit', env: { ...process.env, CSC_IDENTITY_AUTO_DISCOVERY: 'false' } });
+  execSync(cmd, { cwd, stdio: 'inherit', env: { ...process.env, ...extraEnv } });
 }
 
 try {
   run('npm prune --omit=dev', backendDir);
-  run('npx electron-builder --win nsis zip', electronDir);
+  run('npx electron-builder --win nsis zip', electronDir, {
+    CSC_LINK: certPath,
+    CSC_KEY_PASSWORD: 'PharmaManagerDevSigning2026',
+  });
 } finally {
   run('npm install', backendDir);
 }

@@ -4,3 +4,4 @@ resources/db-template.sqlite
 resources/icon.png
 resources/icon.ico
 resources/icon.icns
+resources/dev-signing-cert.pfx

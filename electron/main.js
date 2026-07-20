@@ -9,6 +9,26 @@ const crypto = require('crypto');
 const APP_NAME = 'Pharma Manager';
 app.setName(APP_NAME);
 
+// يمنع تشغيل أكثر من نسخة واحدة من التطبيق في آن واحد. ضروري هنا تحديداً: كل نسخة
+// تحاول ربط نفس منفذ الخادم الخلفي الثابت (34115 — راجع BACKEND_PORT أدناه) وفتح
+// نفس ملف قاعدة بيانات SQLite في userData. بدون هذا القفل، تشغيل نسخة ثانية (مثلاً
+// نسخة مثبَّتة من Program Files ونسخة أخرى محمولة/تطويرية في آن واحد) يجعل الخادم
+// الخلفي للنسخة الثانية يفشل في الاستماع على المنفذ فوراً ويتعطل — وهو أخطر من مجرد
+// رسالة عطل: نسختان تكتبان في نفس ملف SQLite في آن واحد قد تُفسدان البيانات فعلياً
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+  app.quit();
+  return;
+}
+
+app.on('second-instance', () => {
+  const [existingWindow] = BrowserWindow.getAllWindows();
+  if (existingWindow) {
+    if (existingWindow.isMinimized()) existingWindow.restore();
+    existingWindow.focus();
+  }
+});
+
 // منفذ ثابت للخادم الخلفي: يجب أن يطابق NEXT_PUBLIC_API_URL المُخبوز داخل تصدير
 // الواجهة الثابت وقت البناء (راجع electron/build-frontend-export.js) — لا يمكن اختياره
 // ديناميكياً كما في التطوير المحلي، لأن ملفات الواجهة الثابتة لا تُبنى من جديد عند كل تشغيل
@@ -217,6 +237,29 @@ function watchForUnexpectedExit(child, logPath) {
   });
 }
 
+// أُضيف بعد إعادة إنتاج عطل حقيقي على هذا الجهاز: أول تشغيل للتطبيق مباشرة بعد
+// تثبيته عبر المثبّت كان يفشل أحياناً بخطأ MODULE_NOT_FOUND رغم أن الملف موجود
+// فعلياً على القرص، ثم ينجح بلا أي تغيير عند إعادة المحاولة فوراً — يطابق سلوك
+// فحص Windows Defender الفوري لملفات .js الكثيرة التي يكتبها المثبّت لتوّه، والذي
+// قد يمنع عملية أخرى (هنا: fork() الخاص بـ Electron) من قراءتها للحظات قصيرة.
+// إعادة محاولة قصيرة تمتص هذا التأخير العابر بدل إظهار رسالة عطل مخيفة من أول تشغيل
+async function startBackendWithRetry(opts, maxAttempts = 3) {
+  let lastError;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const child = startBackend(opts);
+    try {
+      const isLastAttempt = attempt === maxAttempts;
+      await waitForHealth(BACKEND_PORT, isLastAttempt ? 20000 : 6000);
+      return child;
+    } catch (error) {
+      lastError = error;
+      child.kill();
+      if (attempt < maxAttempts) await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+  }
+  throw lastError;
+}
+
 // خادم استاتيكي صغير لتقديم تصدير Next.js الثابت (frontend/out) عبر http محلي بدل
 // file:// مباشرة — يتجنّب مشاكل مسارات الأصول المطلقة (/_next/...) تحت بروتوكول الملفات
 function startStaticServer(rootDir, port) {
@@ -298,7 +341,7 @@ app.whenReady().then(async () => {
     const jwtSecret = ensureJwtSecret(userDataPath);
     const frontendPort = await getFreePort();
 
-    backendProcess = startBackend({
+    backendProcess = await startBackendWithRetry({
       dbPath,
       port: BACKEND_PORT,
       jwtSecret,
@@ -306,7 +349,6 @@ app.whenReady().then(async () => {
       logPath: path.join(userDataPath, 'backend.log'),
     });
 
-    await waitForHealth(BACKEND_PORT);
     watchForUnexpectedExit(backendProcess, path.join(userDataPath, 'backend.log'));
     await startStaticServer(frontendOutPath(), frontendPort);
 
