@@ -200,3 +200,13 @@ export interface ReportSummary {
   topProducts: ProductStat[];
   leastProducts: ProductStat[];
 }
+
+export type BackupStatus = 'SUCCESS' | 'FAILED';
+
+export interface Backup {
+  id: string;
+  filePath: string;
+  sizeBytes: number | null;
+  status: BackupStatus;
+  createdAt: string;
+}

@@ -4,10 +4,13 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { fetchStoreSettings, updateStoreSettings } from '@/lib/store-settings';
+import { createBackup, deleteBackup, fetchBackups, openBackupsFolder, restoreBackup } from '@/lib/backup';
+import { formatDateTime } from '@/lib/utils';
 
 export default function SettingsPage() {
   const queryClient = useQueryClient();
@@ -69,6 +72,45 @@ export default function SettingsPage() {
     e.preventDefault();
     setError(null);
     mutation.mutate();
+  }
+
+  const { data: backups } = useQuery({ queryKey: ['backups'], queryFn: fetchBackups });
+  const [restoring, setRestoring] = useState(false);
+
+  const createBackupMutation = useMutation({
+    mutationFn: createBackup,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['backups'] }),
+  });
+
+  const deleteBackupMutation = useMutation({
+    mutationFn: deleteBackup,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['backups'] }),
+  });
+
+  const restoreBackupMutation = useMutation({
+    mutationFn: restoreBackup,
+    onSuccess: () => setRestoring(true),
+  });
+
+  function handleDeleteBackup(id: string, createdAt: string) {
+    if (window.confirm(`هل تريد حذف النسخة الاحتياطية بتاريخ ${formatDateTime(createdAt)}؟`)) {
+      deleteBackupMutation.mutate(id);
+    }
+  }
+
+  function handleRestoreBackup(id: string, createdAt: string) {
+    if (
+      window.confirm(
+        `هل تريد استعادة النسخة الاحتياطية بتاريخ ${formatDateTime(createdAt)}؟ سيُعاد تشغيل التطبيق وسيُستبدَل كل ما تغيّر بعد هذا التاريخ.`,
+      )
+    ) {
+      restoreBackupMutation.mutate(id);
+    }
+  }
+
+  function formatSize(bytes: number | null) {
+    if (!bytes) return '—';
+    return `${(bytes / (1024 * 1024)).toFixed(2)} م.ب.`;
   }
 
   return (
@@ -136,6 +178,86 @@ export default function SettingsPage() {
           </Button>
         </div>
       </form>
+
+      <div className="flex flex-col gap-4">
+        <div>
+          <h2 className="text-xl font-bold">النسخ الاحتياطي والاستعادة</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            تُحفظ النسخ الاحتياطية محلياً على هذا الجهاز فقط
+          </p>
+        </div>
+
+        <Card>
+          <CardContent className="flex flex-col gap-4 p-5">
+            {restoring ? (
+              <p className="text-sm text-primary">
+                تتم استعادة النسخة الاحتياطية... سيُعاد تشغيل التطبيق تلقائياً خلال لحظات.
+              </p>
+            ) : (
+              <>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    onClick={() => createBackupMutation.mutate()}
+                    disabled={createBackupMutation.isPending}
+                  >
+                    {createBackupMutation.isPending ? 'جارٍ إنشاء نسخة...' : 'إنشاء نسخة احتياطية الآن'}
+                  </Button>
+                  <Button type="button" variant="outline" onClick={() => openBackupsFolder()}>
+                    فتح مجلد النسخ الاحتياطية
+                  </Button>
+                </div>
+
+                {createBackupMutation.isError && (
+                  <p className="text-sm text-destructive">تعذّر إنشاء النسخة الاحتياطية</p>
+                )}
+                {restoreBackupMutation.isError && (
+                  <p className="text-sm text-destructive">تعذّرت استعادة النسخة الاحتياطية</p>
+                )}
+
+                <div className="flex flex-col divide-y divide-border">
+                  {!backups?.length && (
+                    <p className="py-3 text-sm text-muted-foreground">لا توجد نسخ احتياطية بعد</p>
+                  )}
+                  {backups?.map((backup) => (
+                    <div key={backup.id} className="flex items-center justify-between gap-3 py-3">
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">{formatDateTime(backup.createdAt)}</span>
+                          <Badge variant={backup.status === 'SUCCESS' ? 'default' : 'destructive'}>
+                            {backup.status === 'SUCCESS' ? 'ناجحة' : 'فاشلة'}
+                          </Badge>
+                        </div>
+                        <span className="text-xs text-muted-foreground">{formatSize(backup.sizeBytes)}</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={backup.status !== 'SUCCESS' || restoreBackupMutation.isPending}
+                          onClick={() => handleRestoreBackup(backup.id, backup.createdAt)}
+                        >
+                          استعادة
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={deleteBackupMutation.isPending}
+                          onClick={() => handleDeleteBackup(backup.id, backup.createdAt)}
+                        >
+                          حذف
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

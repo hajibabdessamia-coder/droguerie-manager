@@ -74,6 +74,27 @@ function ensureDatabase(userDataPath) {
   return dbPath;
 }
 
+// يُستدعى قبل ensureDatabase: يطبّق نسخة احتياطية طلب المستخدم استعادتها (راجع
+// backend/src/backup/backup.service.ts) — لا يمكن استبدال قاعدة البيانات الحية
+// بينما الخادم الخلفي متصل بها، لذا يكتب الخادم علامة عند طلب الاستعادة ثم يطلب
+// إعادة تشغيل التطبيق بأكمله (app.relaunch)؛ هذه الدالة تُطبَّق فقط عند إعادة
+// التشغيل التالية، قبل أن يبدأ أي اتصال جديد بقاعدة البيانات
+function applyPendingRestore(userDataPath) {
+  const marker = path.join(userDataPath, 'restore-pending.db');
+  if (!fs.existsSync(marker)) return;
+
+  const dbPath = path.join(userDataPath, 'pharma-manager.db');
+  fs.copyFileSync(marker, dbPath);
+  fs.unlinkSync(marker);
+
+  // حذف ملفات SQLite الجانبية المتبقية من قاعدة البيانات القديمة (وضع WAL) —
+  // تركها قد يجعل SQLite يحاول دمج إطارات WAL قديمة غير متوافقة مع الملف الجديد
+  for (const suffix of ['-journal', '-wal', '-shm']) {
+    const sidecar = dbPath + suffix;
+    if (fs.existsSync(sidecar)) fs.unlinkSync(sidecar);
+  }
+}
+
 // سرّ JWT يُولَّد مرة واحدة عند أول تشغيل ويُحفظ محلياً لهذا الجهاز فقط — لا يوجد
 // خادم سحابي يوفّره كمتغيّر بيئة كما كان الحال سابقاً في Render
 function ensureJwtSecret(userDataPath) {
@@ -91,6 +112,23 @@ function ensureJwtSecret(userDataPath) {
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
   }
   return config.jwtSecret;
+}
+
+// يمنع نمو backend.log بلا حدود على تثبيت طويل الأمد عند عميل حقيقي — لا توجد
+// فرقة عمليات تراقب مساحة القرص، فيُعاد تسمية الملف القديم كسجل احتياطي واحد
+// بدل تراكم سجلات لا نهائية
+const MAX_LOG_BYTES = 5 * 1024 * 1024;
+
+function rotateLogIfLarge(logPath) {
+  try {
+    if (fs.existsSync(logPath) && fs.statSync(logPath).size > MAX_LOG_BYTES) {
+      const rotatedPath = `${logPath}.old`;
+      if (fs.existsSync(rotatedPath)) fs.unlinkSync(rotatedPath);
+      fs.renameSync(logPath, rotatedPath);
+    }
+  } catch {
+    // فشل التدوير ليس سبباً كافياً لمنع بدء التطبيق — سيُتابَع الكتابة على الملف كما هو
+  }
 }
 
 function waitForHealth(port, timeoutMs = 20000) {
@@ -118,6 +156,9 @@ function waitForHealth(port, timeoutMs = 20000) {
 }
 
 let backendProcess = null;
+// يمنع معالج 'exit' أدناه من معاملة الخروج المتعمّد (بسبب استعادة نسخة احتياطية
+// أو إغلاق طبيعي للتطبيق) كأنه عطل غير متوقع في الخادم الخلفي
+let backendExitExpected = false;
 
 function startBackend({ dbPath, port, jwtSecret, userDataPath, logPath }) {
   const env = {
@@ -137,6 +178,7 @@ function startBackend({ dbPath, port, jwtSecret, userDataPath, logPath }) {
     NODE_ENV: 'production',
   };
 
+  rotateLogIfLarge(logPath);
   const logStream = fs.createWriteStream(logPath, { flags: 'a' });
   const child = fork(backendMainPath(), [], {
     cwd: userDataPath,
@@ -145,7 +187,34 @@ function startBackend({ dbPath, port, jwtSecret, userDataPath, logPath }) {
   });
   child.stdout?.on('data', (d) => logStream.write(d));
   child.stderr?.on('data', (d) => logStream.write(d));
+
+  // راجع backend/src/backup/backup.service.ts: يرسل هذه الرسالة عبر قناة fork()
+  // الداخلية بعد كتابة علامة الاستعادة، فتُعيد Electron تشغيل نفسها بالكامل —
+  // هذا يضمن عدم وجود أي اتصال Prisma مفتوح عند تطبيق الاستعادة عند الإقلاع التالي
+  child.on('message', (msg) => {
+    if (msg && msg.type === 'restore-requested') {
+      backendExitExpected = true;
+      app.relaunch();
+      app.exit(0);
+    }
+  });
+
   return child;
+}
+
+// يُستدعى فقط بعد أن يجتاز الخادم فحص الصحة بنجاح (waitForHealth) — أثناء بدء
+// التشغيل نفسه، فشل الخادم يُعالَج أصلاً برسالة واحدة واضحة عبر try/catch في
+// whenReady؛ ربط هذا المعالج مبكراً جداً كان يسبب ظهور رسالتي خطأ متتاليتين
+// لنفس العطل عندما يفشل الخادم قبل أن يصبح جاهزاً
+function watchForUnexpectedExit(child, logPath) {
+  child.on('exit', (code, signal) => {
+    if (backendExitExpected) return;
+    dialog.showErrorBox(
+      'توقف الخادم الخلفي بشكل غير متوقع',
+      `رمز الخروج: ${code ?? 'غير معروف'} ${signal ? `(إشارة: ${signal})` : ''}\nراجع سجل الأخطاء في: ${logPath}`,
+    );
+    app.quit();
+  });
 }
 
 // خادم استاتيكي صغير لتقديم تصدير Next.js الثابت (frontend/out) عبر http محلي بدل
@@ -203,6 +272,9 @@ async function createMainWindow(frontendPort) {
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
+      // يمنع الوصول لأدوات المطوّر (F12 وغيره) في النسخة المُعبّأة النهائية —
+      // تبقى متاحة في وضع التطوير (electron .) للتشخيص
+      devTools: !app.isPackaged,
     },
   });
 
@@ -221,6 +293,7 @@ app.whenReady().then(async () => {
   fs.mkdirSync(userDataPath, { recursive: true });
 
   try {
+    applyPendingRestore(userDataPath);
     const dbPath = ensureDatabase(userDataPath);
     const jwtSecret = ensureJwtSecret(userDataPath);
     const frontendPort = await getFreePort();
@@ -234,6 +307,7 @@ app.whenReady().then(async () => {
     });
 
     await waitForHealth(BACKEND_PORT);
+    watchForUnexpectedExit(backendProcess, path.join(userDataPath, 'backend.log'));
     await startStaticServer(frontendOutPath(), frontendPort);
 
     await createMainWindow(frontendPort);
@@ -248,10 +322,19 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => {
+  backendExitExpected = true;
   if (backendProcess) backendProcess.kill();
   if (process.platform !== 'darwin') app.quit();
 });
 
 app.on('before-quit', () => {
+  backendExitExpected = true;
   if (backendProcess) backendProcess.kill();
+});
+
+// شبكة أمان أخيرة: خطأ متزامن غير متوقع في العملية الرئيسية لـ Electron (خارج
+// try/catch الموجود في whenReady) كان سيتسبب في إغلاق صامت بلا أي رسالة للمستخدم
+process.on('uncaughtException', (error) => {
+  dialog.showErrorBox('خطأ غير متوقع', String(error && error.stack ? error.stack : error));
+  app.exit(1);
 });

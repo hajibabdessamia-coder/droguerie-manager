@@ -16,6 +16,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { StoreSettingsModule } from './store-settings/store-settings.module';
 import { ReportsModule } from './reports/reports.module';
+import { BackupModule } from './backup/backup.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 
@@ -37,6 +38,7 @@ import { RolesGuard } from './auth/guards/roles.guard';
     UploadsModule,
     StoreSettingsModule,
     ReportsModule,
+    BackupModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
