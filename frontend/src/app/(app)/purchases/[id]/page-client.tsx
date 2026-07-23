@@ -1,16 +1,16 @@
 'use client';
 
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { fetchPurchase } from '@/lib/purchases';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
+import { useRouteId } from '@/lib/use-route-id';
 
 export default function PurchaseDetailPage() {
-  const { id } = useParams<{ id: string }>();
+  const id = useRouteId();
 
   const { data: purchase, isLoading } = useQuery({
     queryKey: ['purchase', id],

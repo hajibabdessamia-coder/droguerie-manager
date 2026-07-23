@@ -1,8 +1,10 @@
 import PageClient from './page-client';
 
-// مطلوب لبناء التصدير الثابت (output: export) لتطبيق Electron: المكوّن الفعلي في
-// page-client.tsx يقرأ المعرّف الحقيقي في المتصفح عبر useParams()، والتنقّل بينها
-// يتم دائماً من داخل التطبيق (تنقّل جانب العميل)، وليس بفتح رابط مباشر بمعرّف عشوائي.
+// مطلوب لبناء التصدير الثابت (output: export) لتطبيق Electron: قيمة 'placeholder' هي
+// شكل واحد فقط يُصدَّر لكل مسار ديناميكي. المكوّن الفعلي في page-client.tsx يقرأ المعرّف
+// الحقيقي من مسار المتصفح مباشرة (راجع src/lib/use-route-id.ts) لأن useParams() يبقى
+// عالقاً على قيمة البناء هذه حتى بعد تنقّل حقيقي من جانب العميل (Link) — وليس فقط عند
+// فتح رابط مباشر كما افتُرض سابقاً.
 export function generateStaticParams() {
   return [{ id: 'placeholder' }];
 }

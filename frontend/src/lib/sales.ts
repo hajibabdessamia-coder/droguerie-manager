@@ -29,6 +29,11 @@ export async function fetchSale(id: string): Promise<SaleDetail> {
   return data;
 }
 
+export async function fetchSales(): Promise<SaleDetail[]> {
+  const { data } = await apiClient.get<SaleDetail[]>('/sales');
+  return data;
+}
+
 export interface UpdateSaleInput {
   invoiceType?: InvoiceType;
   paymentMethod?: PaymentMethod;

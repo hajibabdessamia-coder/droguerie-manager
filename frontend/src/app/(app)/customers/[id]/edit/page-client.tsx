@@ -1,12 +1,12 @@
 'use client';
 
-import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { CustomerForm } from '@/components/customers/customer-form';
 import { fetchCustomer } from '@/lib/customers';
+import { useRouteId } from '@/lib/use-route-id';
 
 export default function EditCustomerPage() {
-  const { id } = useParams<{ id: string }>();
+  const id = useRouteId();
   const { data: customer, isLoading } = useQuery({
     queryKey: ['customer', id],
     queryFn: () => fetchCustomer(id),

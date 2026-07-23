@@ -1,13 +1,13 @@
 'use client';
 
-import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { ProductForm } from '@/components/products/product-form';
 import { StockAdjustment } from '@/components/products/stock-adjustment';
 import { fetchProduct } from '@/lib/products';
+import { useRouteId } from '@/lib/use-route-id';
 
 export default function EditProductPage() {
-  const { id } = useParams<{ id: string }>();
+  const id = useRouteId();
   const { data: product, isLoading } = useQuery({
     queryKey: ['product', id],
     queryFn: () => fetchProduct(id),

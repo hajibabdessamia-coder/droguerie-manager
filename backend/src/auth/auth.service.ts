@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
@@ -57,5 +57,23 @@ export class AuthService {
     await this.audit.log(userId, 'UPDATE', 'User', userId, 'تغيير كلمة المرور');
 
     return { ok: true };
+  }
+
+  async changeEmail(userId: string, currentPassword: string, newEmail: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new UnauthorizedException('المستخدم غير موجود');
+
+    const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!valid) throw new UnauthorizedException('كلمة المرور الحالية غير صحيحة');
+
+    if (newEmail !== user.email) {
+      const existing = await this.prisma.user.findUnique({ where: { email: newEmail } });
+      if (existing) throw new ConflictException('هذا البريد الإلكتروني مستخدم بالفعل');
+    }
+
+    const updated = await this.prisma.user.update({ where: { id: userId }, data: { email: newEmail } });
+    await this.audit.log(userId, 'UPDATE', 'User', userId, 'تغيير البريد الإلكتروني');
+
+    return { id: updated.id, name: updated.name, email: updated.email, role: updated.role };
   }
 }

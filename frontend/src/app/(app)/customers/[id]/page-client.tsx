@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Trash2 } from 'lucide-react';
@@ -12,12 +12,13 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { addCustomerPayment, deleteCustomer, fetchCustomer } from '@/lib/customers';
 import { cn, formatCurrency, formatDateTime } from '@/lib/utils';
+import { useRouteId } from '@/lib/use-route-id';
 import { useAuthStore } from '@/store/auth-store';
 
 const TYPE_LABEL: Record<string, string> = { WHOLESALE: 'جملة', RETAIL: 'تقسيط' };
 
 export default function CustomerDetailPage() {
-  const { id } = useParams<{ id: string }>();
+  const id = useRouteId();
   const router = useRouter();
   const queryClient = useQueryClient();
   const isAdmin = useAuthStore((s) => s.user?.role === 'ADMIN');

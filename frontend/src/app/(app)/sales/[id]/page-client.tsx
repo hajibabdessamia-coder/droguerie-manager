@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
@@ -13,11 +13,12 @@ import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { deleteSale, downloadSaleInvoicePdf, fetchSale, updateSale } from '@/lib/sales';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
+import { useRouteId } from '@/lib/use-route-id';
 import { useAuthStore } from '@/store/auth-store';
 import type { InvoiceType, PaymentMethod } from '@/types';
 
 export default function SaleDetailPage() {
-  const { id } = useParams<{ id: string }>();
+  const id = useRouteId();
   const router = useRouter();
   const queryClient = useQueryClient();
   const isAdmin = useAuthStore((s) => s.user?.role === 'ADMIN');

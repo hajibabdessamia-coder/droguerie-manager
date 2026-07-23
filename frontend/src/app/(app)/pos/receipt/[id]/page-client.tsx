@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { Printer } from 'lucide-react';
 import { buttonVariants } from '@/components/ui/button';
@@ -9,13 +8,15 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { fetchSale } from '@/lib/sales';
 import { fetchStoreSettings } from '@/lib/store-settings';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
+import { useRouteId } from '@/lib/use-route-id';
 
 export default function ReceiptPage() {
-  const { id } = useParams<{ id: string }>();
+  const id = useRouteId();
   const { data: sale, isLoading } = useQuery({ queryKey: ['sale', id], queryFn: () => fetchSale(id) });
   const { data: settings } = useQuery({ queryKey: ['store-settings'], queryFn: fetchStoreSettings });
 
-  if (isLoading || !sale) return <Skeleton className="mx-auto h-96 w-full max-w-2xl" />;
+  if (isLoading) return <Skeleton className="mx-auto h-96 w-full max-w-2xl" />;
+  if (!sale) return <p className="text-sm text-destructive">الفاتورة غير موجودة.</p>;
 
   const isLegal = sale.invoiceType === 'LEGAL';
 

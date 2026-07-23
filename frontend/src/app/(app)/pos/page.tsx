@@ -259,10 +259,24 @@ export default function PosPage() {
             <div className="flex max-h-64 flex-col gap-2 overflow-y-auto">
               {lines.length === 0 && <p className="py-6 text-center text-sm text-muted-foreground">السلة فارغة</p>}
               {lines.map((line) => (
-                <div key={line.productId} className="flex items-center gap-2 rounded-lg border border-border p-2">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{line.name}</p>
-                    <div className="mt-1 flex items-center gap-2">
+                <div key={line.productId} className="flex flex-col gap-2 rounded-lg border border-border p-2">
+                  <div className="flex items-center gap-2">
+                    <p className="min-w-0 flex-1 truncate text-sm font-medium">{line.name}</p>
+                    <div className="w-16 shrink-0 text-left text-sm font-medium">
+                      {formatCurrency(resolveUnitPrice(line) * line.quantity)}
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 shrink-0"
+                      onClick={() => removeLine(line.productId)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <Select
                         value={line.priceType}
                         onChange={(e) => updateLine(line.productId, { priceType: e.target.value as PriceType })}
@@ -284,40 +298,28 @@ export default function PosPage() {
                         />
                       )}
                     </div>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={() => changeQty(line.productId, -1)}
+                      >
+                        <Minus className="h-3 w-3" />
+                      </Button>
+                      <span className="w-5 text-center text-sm">{line.quantity}</span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={() => changeQty(line.productId, 1)}
+                      >
+                        <Plus className="h-3 w-3" />
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={() => changeQty(line.productId, -1)}
-                    >
-                      <Minus className="h-3 w-3" />
-                    </Button>
-                    <span className="w-5 text-center text-sm">{line.quantity}</span>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={() => changeQty(line.productId, 1)}
-                    >
-                      <Plus className="h-3 w-3" />
-                    </Button>
-                  </div>
-                  <div className="w-16 text-left text-sm font-medium">
-                    {formatCurrency(resolveUnitPrice(line) * line.quantity)}
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={() => removeLine(line.productId)}
-                  >
-                    <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                  </Button>
                 </div>
               ))}
             </div>

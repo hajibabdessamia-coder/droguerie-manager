@@ -1,12 +1,12 @@
 'use client';
 
-import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { SupplierForm } from '@/components/suppliers/supplier-form';
 import { fetchSupplier } from '@/lib/suppliers';
+import { useRouteId } from '@/lib/use-route-id';
 
 export default function EditSupplierPage() {
-  const { id } = useParams<{ id: string }>();
+  const id = useRouteId();
   const { data: supplier, isLoading } = useQuery({
     queryKey: ['supplier', id],
     queryFn: () => fetchSupplier(id),

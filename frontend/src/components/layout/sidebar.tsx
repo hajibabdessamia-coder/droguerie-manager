@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   BarChart3,
+  FileText,
   KeyRound,
   LayoutDashboard,
   Package,
@@ -21,6 +22,7 @@ import type { Role } from '@/types';
 const NAV_ITEMS: { href: string; label: string; icon: typeof LayoutDashboard; roles?: Role[] }[] = [
   { href: '/dashboard', label: 'لوحة التحكم', icon: LayoutDashboard },
   { href: '/pos', label: 'نقطة البيع', icon: ShoppingCart },
+  { href: '/sales', label: 'الفواتير المحفوظة', icon: FileText },
   { href: '/products', label: 'المنتجات', icon: Package },
   { href: '/customers', label: 'الزبائن', icon: Users },
   { href: '/suppliers', label: 'الموردون', icon: Truck },

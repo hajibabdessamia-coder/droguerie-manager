@@ -180,7 +180,7 @@ let backendProcess = null;
 // أو إغلاق طبيعي للتطبيق) كأنه عطل غير متوقع في الخادم الخلفي
 let backendExitExpected = false;
 
-function startBackend({ dbPath, port, jwtSecret, userDataPath, logPath }) {
+function startBackend({ dbPath, port, frontendPort, jwtSecret, userDataPath, logPath }) {
   const env = {
     ...process.env,
     // بدون هذا، fork() من داخل العملية الرئيسية لـ Electron يعيد تشغيل ثنائي Electron
@@ -191,7 +191,11 @@ function startBackend({ dbPath, port, jwtSecret, userDataPath, logPath }) {
     PORT: String(port),
     JWT_SECRET: jwtSecret,
     JWT_EXPIRES_IN: '8h',
-    CORS_ORIGIN: `http://localhost:${port},http://127.0.0.1:${port}`,
+    // يجب أن يشمل منفذ الواجهة الفعلي (frontendPort، يُختار عشوائياً عبر getFreePort()
+    // عند كل تشغيل) وليس فقط منفذ الخادم الخلفي الثابت — نافذة Electron تُحمَّل من
+    // frontendPort، فهو Origin الفعلي لأي طلب fetch من الواجهة. إبقاء منفذ الخادم
+    // الخلفي في القائمة أيضاً للحفاظ على وصول أدوات مثل /api/docs مباشرة على 34115
+    CORS_ORIGIN: `http://localhost:${port},http://127.0.0.1:${port},http://localhost:${frontendPort},http://127.0.0.1:${frontendPort}`,
     PUBLIC_URL: `http://127.0.0.1:${port}`,
     PUPPETEER_CACHE_DIR: puppeteerCacheDir(),
     STORAGE_PROVIDER: 'local',
@@ -275,16 +279,47 @@ function startStaticServer(rootDir, port) {
     '.woff2': 'font/woff2',
   };
 
-  const server = http.createServer((req, res) => {
-    let urlPath = decodeURIComponent(req.url.split('?')[0]);
-    if (urlPath === '/') urlPath = '/index.html';
+  // مسارات ديناميكية (مثال: /suppliers/<id> بعد إنشائه في وقت التشغيل) لا تملك ملف
+  // HTML مبنيّ مسبقاً باسمها الحقيقي — الواجهة تُصدَّر بـ generateStaticParams يعيد
+  // معرّفاً وهمياً واحداً فقط (`placeholder`، راجع مثلاً app/(app)/suppliers/[id]/page.tsx)
+  // لأن next export لا يمكنه معرفة كل المعرّفات التي ستُنشأ لاحقاً في قاعدة بيانات
+  // العميل. ملف placeholder.html هذا هو نفس React shell لأي قيمة معرّف حقيقية —
+  // useParams() يبقى عالقاً على 'placeholder' حتى بعد تنقّل حقيقي من جانب العميل (تأكَّد
+  // هذا فعلياً، وليس افتراضاً)، لذا يقرأ المكوّن الفعلي (page-client.tsx) المعرّف من مسار
+  // المتصفح مباشرة (راجع src/lib/use-route-id.ts) بدل الاعتماد على حالة الموجّه. عند فشل
+  // تطابق مسار مباشر هنا في الخادم، نجرّب استبدال كل جزء من المسار (بدءاً من الأقرب
+  // للنهاية) بكلمة "placeholder" ونعيد المحاولة — إن وُجد ملف مطابق نخدمه، فهو الغلاف
+  // الصحيح لهذا المسار الديناميكي.
+  function resolveFilePath(urlPath) {
+    const direct = path.join(rootDir, urlPath);
+    if (fs.existsSync(direct) && fs.statSync(direct).isFile()) return direct;
 
-    let filePath = path.join(rootDir, urlPath);
-    if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
-      // مسارات Next.js الثابتة بدون امتداد (مثال: /dashboard) تُخدَّم من dashboard.html
-      const withHtml = `${filePath}.html`;
-      filePath = fs.existsSync(withHtml) ? withHtml : path.join(rootDir, '404.html');
+    const withHtml = `${direct}.html`;
+    if (fs.existsSync(withHtml)) return withHtml;
+
+    if (fs.existsSync(direct) && fs.statSync(direct).isDirectory()) {
+      const indexHtml = path.join(direct, 'index.html');
+      if (fs.existsSync(indexHtml)) return indexHtml;
     }
+
+    const segments = urlPath.split('/').filter(Boolean);
+    for (let i = segments.length - 1; i >= 0; i--) {
+      if (segments[i] === 'placeholder') continue;
+      const candidateSegments = [...segments];
+      candidateSegments[i] = 'placeholder';
+      const candidatePath = `/${candidateSegments.join('/')}`;
+      const candidateHtml = path.join(rootDir, `${candidatePath}.html`);
+      if (fs.existsSync(candidateHtml)) return candidateHtml;
+      const candidateIndex = path.join(rootDir, candidatePath, 'index.html');
+      if (fs.existsSync(candidateIndex)) return candidateIndex;
+    }
+
+    return path.join(rootDir, '404.html');
+  }
+
+  const server = http.createServer((req, res) => {
+    const requestPath = decodeURIComponent(req.url.split('?')[0]);
+    const filePath = requestPath === '/' ? path.join(rootDir, 'index.html') : resolveFilePath(requestPath);
 
     fs.readFile(filePath, (err, data) => {
       if (err) {
@@ -344,6 +379,7 @@ app.whenReady().then(async () => {
     backendProcess = await startBackendWithRetry({
       dbPath,
       port: BACKEND_PORT,
+      frontendPort,
       jwtSecret,
       userDataPath,
       logPath: path.join(userDataPath, 'backend.log'),
