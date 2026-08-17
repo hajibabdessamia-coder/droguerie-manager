@@ -108,6 +108,7 @@ export interface AuthUser {
   name: string;
   email: string;
   role: Role;
+  mustChangePassword: boolean;
 }
 
 export interface LowStockProduct {

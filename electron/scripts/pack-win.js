@@ -27,6 +27,14 @@ if (!fs.existsSync(certPath)) {
   process.exit(1);
 }
 
+if (!process.env.CSC_KEY_PASSWORD) {
+  console.error('CSC_KEY_PASSWORD environment variable is not set.');
+  console.error('Set it to the password used when the signing certificate was created');
+  console.error('(scripts/make-dev-cert.ps1), then re-run this script. Example (PowerShell):');
+  console.error('  $env:CSC_KEY_PASSWORD = "<your-cert-password>"; node scripts/pack-win.js');
+  process.exit(1);
+}
+
 function run(cmd, cwd, extraEnv) {
   console.log(`$ ${cmd}`);
   execSync(cmd, { cwd, stdio: 'inherit', env: { ...process.env, ...extraEnv } });
@@ -36,7 +44,7 @@ try {
   run('npm prune --omit=dev', backendDir);
   run('npx electron-builder --win nsis zip', electronDir, {
     CSC_LINK: certPath,
-    CSC_KEY_PASSWORD: 'PharmaManagerDevSigning2026',
+    CSC_KEY_PASSWORD: process.env.CSC_KEY_PASSWORD,
   });
 } finally {
   run('npm install', backendDir);

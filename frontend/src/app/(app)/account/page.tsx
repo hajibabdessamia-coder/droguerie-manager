@@ -9,8 +9,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { changeEmail, changePassword } from '@/lib/auth';
 import { useAuthStore } from '@/store/auth-store';
+import { useLocale } from '@/i18n/locale-provider';
 
 function ChangeEmailCard() {
+  const { t } = useLocale();
   const user = useAuthStore((s) => s.user);
   const updateUser = useAuthStore((s) => s.updateUser);
   const [currentPassword, setCurrentPassword] = useState('');
@@ -29,7 +31,7 @@ function ChangeEmailCard() {
     },
     onError: (err) => {
       const message = isAxiosError(err) ? err.response?.data?.message : undefined;
-      setError(Array.isArray(message) ? message[0] : message ?? 'حدث خطأ أثناء تغيير البريد الإلكتروني');
+      setError(Array.isArray(message) ? message[0] : message ?? t('account.emailChangeError'));
     },
   });
 
@@ -44,11 +46,11 @@ function ChangeEmailCard() {
       <Card>
         <CardContent className="flex flex-col gap-4 p-5 md:max-w-md">
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="currentEmail">البريد الإلكتروني الحالي</Label>
+            <Label htmlFor="currentEmail">{t('account.currentEmailLabel')}</Label>
             <Input id="currentEmail" disabled value={user?.email ?? ''} />
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="newEmail">البريد الإلكتروني الجديد</Label>
+            <Label htmlFor="newEmail">{t('account.newEmailLabel')}</Label>
             <Input
               id="newEmail"
               type="email"
@@ -58,7 +60,7 @@ function ChangeEmailCard() {
             />
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="currentPasswordForEmail">كلمة المرور الحالية</Label>
+            <Label htmlFor="currentPasswordForEmail">{t('account.currentPasswordLabel')}</Label>
             <Input
               id="currentPasswordForEmail"
               type="password"
@@ -71,11 +73,11 @@ function ChangeEmailCard() {
       </Card>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
-      {saved && <p className="text-sm text-primary">تم تغيير البريد الإلكتروني بنجاح</p>}
+      {saved && <p className="text-sm text-primary">{t('account.emailChangedSuccess')}</p>}
 
       <div className="flex justify-end md:max-w-md">
         <Button type="submit" disabled={mutation.isPending}>
-          {mutation.isPending ? 'جارٍ الحفظ...' : 'تغيير البريد الإلكتروني'}
+          {mutation.isPending ? t('common.saving') : t('account.changeEmailButton')}
         </Button>
       </div>
     </form>
@@ -83,6 +85,9 @@ function ChangeEmailCard() {
 }
 
 function ChangePasswordCard() {
+  const { t } = useLocale();
+  const user = useAuthStore((s) => s.user);
+  const updateUser = useAuthStore((s) => s.updateUser);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -92,6 +97,7 @@ function ChangePasswordCard() {
   const mutation = useMutation({
     mutationFn: () => changePassword(currentPassword, newPassword),
     onSuccess: () => {
+      if (user) updateUser({ ...user, mustChangePassword: false });
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
@@ -100,15 +106,15 @@ function ChangePasswordCard() {
     },
     onError: (err) => {
       const message = isAxiosError(err) ? err.response?.data?.message : undefined;
-      setError(Array.isArray(message) ? message[0] : message ?? 'حدث خطأ أثناء تغيير كلمة المرور');
+      setError(Array.isArray(message) ? message[0] : message ?? t('account.passwordChangeError'));
     },
   });
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    if (newPassword.length < 8) return setError('كلمة المرور الجديدة يجب أن تكون 8 أحرف على الأقل');
-    if (newPassword !== confirmPassword) return setError('كلمتا المرور الجديدتان غير متطابقتين');
+    if (newPassword.length < 8) return setError(t('account.passwordTooShort'));
+    if (newPassword !== confirmPassword) return setError(t('account.passwordMismatch'));
     mutation.mutate();
   }
 
@@ -117,7 +123,7 @@ function ChangePasswordCard() {
       <Card>
         <CardContent className="flex flex-col gap-4 p-5 md:max-w-md">
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="currentPassword">كلمة المرور الحالية</Label>
+            <Label htmlFor="currentPassword">{t('account.currentPasswordLabel')}</Label>
             <Input
               id="currentPassword"
               type="password"
@@ -127,7 +133,7 @@ function ChangePasswordCard() {
             />
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="newPassword">كلمة المرور الجديدة</Label>
+            <Label htmlFor="newPassword">{t('account.newPasswordLabel')}</Label>
             <Input
               id="newPassword"
               type="password"
@@ -138,7 +144,7 @@ function ChangePasswordCard() {
             />
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="confirmPassword">تأكيد كلمة المرور الجديدة</Label>
+            <Label htmlFor="confirmPassword">{t('account.confirmNewPasswordLabel')}</Label>
             <Input
               id="confirmPassword"
               type="password"
@@ -152,11 +158,11 @@ function ChangePasswordCard() {
       </Card>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
-      {saved && <p className="text-sm text-primary">تم تغيير كلمة المرور بنجاح</p>}
+      {saved && <p className="text-sm text-primary">{t('account.passwordChangedSuccess')}</p>}
 
       <div className="flex justify-end md:max-w-md">
         <Button type="submit" disabled={mutation.isPending}>
-          {mutation.isPending ? 'جارٍ الحفظ...' : 'تغيير كلمة المرور'}
+          {mutation.isPending ? t('common.saving') : t('account.changePasswordButton')}
         </Button>
       </div>
     </form>
@@ -164,20 +170,28 @@ function ChangePasswordCard() {
 }
 
 export default function AccountPage() {
+  const { t } = useLocale();
+  const mustChangePassword = useAuthStore((s) => !!s.user?.mustChangePassword);
   return (
     <div className="flex flex-col gap-8">
       <div>
-        <h1 className="text-2xl font-bold">إعدادات المدير</h1>
-        <p className="mt-1 text-sm text-muted-foreground">تغيير البريد الإلكتروني وكلمة مرور حساب المدير</p>
+        <h1 className="text-2xl font-bold">{t('nav.account')}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">{t('account.subtitle')}</p>
       </div>
 
+      {mustChangePassword && (
+        <p className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+          {t('account.mustChangePasswordNotice')}
+        </p>
+      )}
+
       <div className="flex flex-col gap-2">
-        <h2 className="text-lg font-semibold">البريد الإلكتروني</h2>
+        <h2 className="text-lg font-semibold">{t('account.emailSectionTitle')}</h2>
         <ChangeEmailCard />
       </div>
 
       <div className="flex flex-col gap-2">
-        <h2 className="text-lg font-semibold">كلمة المرور</h2>
+        <h2 className="text-lg font-semibold">{t('login.passwordLabel')}</h2>
         <ChangePasswordCard />
       </div>
     </div>

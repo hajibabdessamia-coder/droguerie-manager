@@ -12,14 +12,14 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useDebouncedValue } from '@/hooks/use-debounce';
 import { fetchCustomers } from '@/lib/customers';
 import { cn, formatCurrency } from '@/lib/utils';
-
-const TYPE_LABEL: Record<string, string> = { WHOLESALE: 'جملة', RETAIL: 'تقسيط' };
+import { useLocale } from '@/i18n/locale-provider';
 
 export default function CustomersPage() {
+  const { t, locale } = useLocale();
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search, 300);
 
-  const { data: customers, isLoading } = useQuery({
+  const { data: customers, isLoading, isError } = useQuery({
     queryKey: ['customers', debouncedSearch],
     queryFn: () => fetchCustomers(debouncedSearch || undefined),
   });
@@ -28,24 +28,26 @@ export default function CustomersPage() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">الزبائن</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{customers ? `${customers.length} زبون` : '...'}</p>
+          <h1 className="text-2xl font-bold">{t('customers.pageTitle')}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {customers ? `${customers.length} ${t('customers.countSuffix')}` : '...'}
+          </p>
         </div>
         <Link href="/customers/new" className={buttonVariants({ size: 'default' })}>
           <Plus className="h-4 w-4" />
-          إضافة زبون
+          {t('customers.addCustomer')}
         </Link>
       </div>
 
       <Card>
         <CardContent className="p-4">
           <div className="relative">
-            <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Search className="absolute end-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="بحث بالاسم..."
-              className="pr-9"
+              placeholder={t('common.searchByNamePlaceholder')}
+              className="pe-9"
             />
           </div>
         </CardContent>
@@ -56,10 +58,10 @@ export default function CustomersPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/30 text-right text-muted-foreground">
-                <th className="px-4 py-3 font-medium">الاسم</th>
-                <th className="px-4 py-3 font-medium">الهاتف</th>
-                <th className="px-4 py-3 font-medium">النوع</th>
-                <th className="px-4 py-3 font-medium">الرصيد</th>
+                <th className="px-4 py-3 font-medium">{t('common.name')}</th>
+                <th className="px-4 py-3 font-medium">{t('common.phone')}</th>
+                <th className="px-4 py-3 font-medium">{t('customers.typeLabel')}</th>
+                <th className="px-4 py-3 font-medium">{t('common.balance')}</th>
               </tr>
             </thead>
             <tbody>
@@ -71,14 +73,21 @@ export default function CustomersPage() {
                     </td>
                   </tr>
                 ))}
-              {!isLoading && customers?.length === 0 && (
+              {!isLoading && isError && (
                 <tr>
-                  <td colSpan={4} className="px-4 py-10 text-center text-muted-foreground">
-                    لا يوجد زبائن مطابقون.
+                  <td colSpan={4} className="px-4 py-10 text-center text-destructive">
+                    {t('customers.loadError')}
                   </td>
                 </tr>
               )}
-              {customers?.map((c) => {
+              {!isLoading && !isError && customers?.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="px-4 py-10 text-center text-muted-foreground">
+                    {t('customers.emptyState')}
+                  </td>
+                </tr>
+              )}
+              {!isError && customers?.map((c) => {
                 const balance = Number(c.balance);
                 return (
                   <tr key={c.id} className="border-b border-border last:border-0 hover:bg-accent/40">
@@ -89,10 +98,10 @@ export default function CustomersPage() {
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">{c.phone ?? '—'}</td>
                     <td className="px-4 py-3">
-                      <Badge variant="secondary">{TYPE_LABEL[c.type]}</Badge>
+                      <Badge variant="secondary">{t(`customers.type.${c.type}`)}</Badge>
                     </td>
                     <td className={cn('px-4 py-3 font-medium', balance > 0 && 'text-destructive')}>
-                      {formatCurrency(c.balance)}
+                      {formatCurrency(c.balance, locale)}
                     </td>
                   </tr>
                 );

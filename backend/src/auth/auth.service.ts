@@ -23,7 +23,13 @@ export class AuthService {
 
     return {
       accessToken: this.jwt.sign({ sub: user.id, email: user.email, role: user.role, type: 'access' }),
-      user: { id: user.id, name: user.name, email: user.email, role: user.role },
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        mustChangePassword: user.mustChangePassword,
+      },
     };
   }
 
@@ -53,7 +59,10 @@ export class AuthService {
     if (!valid) throw new UnauthorizedException('كلمة المرور الحالية غير صحيحة');
 
     const passwordHash = await bcrypt.hash(newPassword, 10);
-    await this.prisma.user.update({ where: { id: userId }, data: { passwordHash } });
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash, mustChangePassword: false },
+    });
     await this.audit.log(userId, 'UPDATE', 'User', userId, 'تغيير كلمة المرور');
 
     return { ok: true };
@@ -74,6 +83,12 @@ export class AuthService {
     const updated = await this.prisma.user.update({ where: { id: userId }, data: { email: newEmail } });
     await this.audit.log(userId, 'UPDATE', 'User', userId, 'تغيير البريد الإلكتروني');
 
-    return { id: updated.id, name: updated.name, email: updated.email, role: updated.role };
+    return {
+      id: updated.id,
+      name: updated.name,
+      email: updated.email,
+      role: updated.role,
+      mustChangePassword: updated.mustChangePassword,
+    };
   }
 }

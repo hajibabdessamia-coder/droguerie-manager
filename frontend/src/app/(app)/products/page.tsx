@@ -15,10 +15,12 @@ import { fetchManufacturers } from '@/lib/manufacturers';
 import { deleteProduct, fetchProducts } from '@/lib/products';
 import { formatCurrency } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth-store';
+import { useLocale } from '@/i18n/locale-provider';
 
 export default function ProductsPage() {
   const isAdmin = useAuthStore((s) => s.user?.role === 'ADMIN');
   const queryClient = useQueryClient();
+  const { t, locale } = useLocale();
 
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search, 300);
@@ -27,7 +29,7 @@ export default function ProductsPage() {
 
   const { data: manufacturers } = useQuery({ queryKey: ['manufacturers'], queryFn: fetchManufacturers });
 
-  const { data: products, isLoading } = useQuery({
+  const { data: products, isLoading, isError } = useQuery({
     queryKey: ['products', debouncedSearch, manufacturerId, lowStockOnly],
     queryFn: () =>
       fetchProducts({
@@ -43,33 +45,39 @@ export default function ProductsPage() {
   });
 
   function handleDelete(id: string, name: string) {
-    if (window.confirm(`هل تريد حذف المنتج "${name}"؟`)) deleteMutation.mutate(id);
+    if (window.confirm(`${t('products.deleteConfirmPrefix')} "${name}"${t('products.deleteConfirmSuffix')}`)) {
+      deleteMutation.mutate(id);
+    }
   }
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">المنتجات</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{products ? `${products.length} منتج` : '...'}</p>
+          <h1 className="text-2xl font-bold">{t('products.pageTitle')}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {products ? `${products.length} ${t('products.countSuffix')}` : '...'}
+          </p>
         </div>
         {isAdmin && (
           <Link href="/products/new" className={buttonVariants({ size: 'default' })}>
             <Plus className="h-4 w-4" />
-            إضافة منتج
+            {t('products.addProduct')}
           </Link>
         )}
       </div>
 
+      {deleteMutation.isError && <p className="text-sm text-destructive">{t('products.deleteError')}</p>}
+
       <Card>
         <CardContent className="flex flex-wrap items-center gap-3 p-4">
           <div className="relative min-w-[200px] flex-1">
-            <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Search className="absolute end-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="بحث بالاسم أو الكود..."
-              className="pr-9"
+              placeholder={t('products.searchPlaceholder')}
+              className="pe-9"
             />
           </div>
           <Select
@@ -77,7 +85,7 @@ export default function ProductsPage() {
             onChange={(e) => setManufacturerId(e.target.value)}
             className="w-auto min-w-[150px]"
           >
-            <option value="">كل الشركات المصنعة</option>
+            <option value="">{t('products.allManufacturers')}</option>
             {manufacturers?.map((m) => (
               <option key={m.id} value={m.id}>
                 {m.name}
@@ -90,7 +98,7 @@ export default function ProductsPage() {
             onClick={() => setLowStockOnly((v) => !v)}
           >
             <AlertTriangle className="h-4 w-4" />
-            قليلة المخزون فقط
+            {t('products.lowStockOnly')}
           </Button>
         </CardContent>
       </Card>
@@ -100,12 +108,12 @@ export default function ProductsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/30 text-right text-muted-foreground">
-                <th className="px-4 py-3 font-medium">المنتج</th>
-                <th className="px-4 py-3 font-medium">الكود</th>
-                <th className="px-4 py-3 font-medium">الكمية</th>
-                <th className="px-4 py-3 font-medium">سعر التقسيط</th>
-                <th className="px-4 py-3 font-medium">سعر الجملة</th>
-                {isAdmin && <th className="px-4 py-3 font-medium">إجراءات</th>}
+                <th className="px-4 py-3 font-medium">{t('products.columns.product')}</th>
+                <th className="px-4 py-3 font-medium">{t('products.columns.code')}</th>
+                <th className="px-4 py-3 font-medium">{t('products.columns.quantity')}</th>
+                <th className="px-4 py-3 font-medium">{t('products.columns.retailPrice')}</th>
+                <th className="px-4 py-3 font-medium">{t('products.columns.wholesalePrice')}</th>
+                {isAdmin && <th className="px-4 py-3 font-medium">{t('products.columns.actions')}</th>}
               </tr>
             </thead>
             <tbody>
@@ -117,14 +125,21 @@ export default function ProductsPage() {
                     </td>
                   </tr>
                 ))}
-              {!isLoading && products?.length === 0 && (
+              {!isLoading && isError && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
-                    لا توجد منتجات مطابقة.
+                  <td colSpan={6} className="px-4 py-10 text-center text-destructive">
+                    {t('products.loadError')}
                   </td>
                 </tr>
               )}
-              {products?.map((p) => {
+              {!isLoading && !isError && products?.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
+                    {t('products.emptyState')}
+                  </td>
+                </tr>
+              )}
+              {!isError && products?.map((p) => {
                 const low = p.quantity <= p.minStock;
                 return (
                   <tr key={p.id} className="border-b border-border last:border-0 hover:bg-accent/40">
@@ -135,7 +150,7 @@ export default function ProductsPage() {
                           <img src={p.imageUrl} alt={p.name} className="h-10 w-10 rounded-lg object-cover" />
                         ) : (
                           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted text-[10px] text-muted-foreground">
-                            لا صورة
+                            {t('products.noImage')}
                           </div>
                         )}
                         <span className="font-medium">{p.name}</span>
@@ -147,8 +162,8 @@ export default function ProductsPage() {
                         {p.quantity} / {p.minStock}
                       </Badge>
                     </td>
-                    <td className="px-4 py-3">{formatCurrency(p.retailPrice)}</td>
-                    <td className="px-4 py-3">{formatCurrency(p.wholesalePrice)}</td>
+                    <td className="px-4 py-3">{formatCurrency(p.retailPrice, locale)}</td>
+                    <td className="px-4 py-3">{formatCurrency(p.wholesalePrice, locale)}</td>
                     {isAdmin && (
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1">

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { isAxiosError } from 'axios';
 import { Pencil, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,12 +15,14 @@ import { addSupplierPayment, deleteSupplier, fetchSupplier } from '@/lib/supplie
 import { cn, formatCurrency, formatDateTime } from '@/lib/utils';
 import { useRouteId } from '@/lib/use-route-id';
 import { useAuthStore } from '@/store/auth-store';
+import { useLocale } from '@/i18n/locale-provider';
 
 export default function SupplierDetailPage() {
   const id = useRouteId();
   const router = useRouter();
   const queryClient = useQueryClient();
   const isAdmin = useAuthStore((s) => s.user?.role === 'ADMIN');
+  const { t, locale } = useLocale();
 
   const { data: supplier, isLoading } = useQuery({
     queryKey: ['supplier', id],
@@ -28,6 +31,7 @@ export default function SupplierDetailPage() {
 
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
+  const [paymentError, setPaymentError] = useState<string | null>(null);
 
   const paymentMutation = useMutation({
     mutationFn: () => addSupplierPayment(id, Number(amount), note || undefined),
@@ -37,6 +41,10 @@ export default function SupplierDetailPage() {
       setAmount('');
       setNote('');
     },
+    onError: (err) => {
+      const message = isAxiosError(err) ? err.response?.data?.message : undefined;
+      setPaymentError(message ?? t('suppliers.paymentError'));
+    },
   });
 
   const deleteMutation = useMutation({
@@ -45,7 +53,7 @@ export default function SupplierDetailPage() {
   });
 
   if (isLoading) return <Skeleton className="h-40 w-full" />;
-  if (!supplier) return <p className="text-sm text-destructive">المورد غير موجود.</p>;
+  if (!supplier) return <p className="text-sm text-destructive">{t('suppliers.notFound')}</p>;
 
   const balance = Number(supplier.balance);
 
@@ -55,7 +63,7 @@ export default function SupplierDetailPage() {
         <div>
           <h1 className="text-2xl font-bold">{supplier.name}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {supplier.phone ?? 'بدون هاتف'} · {supplier.address ?? 'بدون عنوان'}
+            {supplier.phone ?? t('common.noPhone')} · {supplier.address ?? t('common.noAddress')}
           </p>
         </div>
         {isAdmin && (
@@ -63,18 +71,20 @@ export default function SupplierDetailPage() {
             <Link href={`/suppliers/${id}/edit`} className="inline-flex">
               <Button type="button" variant="outline">
                 <Pencil className="h-4 w-4" />
-                تعديل
+                {t('common.edit')}
               </Button>
             </Link>
             <Button
               type="button"
               variant="outline"
               onClick={() => {
-                if (window.confirm(`هل تريد حذف المورد "${supplier.name}"؟`)) deleteMutation.mutate();
+                if (window.confirm(`${t('suppliers.deleteConfirmPrefix')} "${supplier.name}"${t('common.deleteConfirmSuffix')}`)) {
+                  deleteMutation.mutate();
+                }
               }}
             >
               <Trash2 className="h-4 w-4 text-destructive" />
-              حذف
+              {t('common.delete')}
             </Button>
           </div>
         )}
@@ -83,24 +93,24 @@ export default function SupplierDetailPage() {
       <Card>
         <CardContent className="flex items-center justify-between p-5">
           <div>
-            <p className="text-sm text-muted-foreground">الرصيد الحالي (دين على المحل)</p>
+            <p className="text-sm text-muted-foreground">{t('suppliers.currentBalanceLabel')}</p>
             <p className={cn('mt-1 text-2xl font-bold', balance > 0 && 'text-destructive')}>
-              {formatCurrency(supplier.balance)}
+              {formatCurrency(supplier.balance, locale)}
             </p>
           </div>
-          {balance > 0 && <Badge variant="destructive">مستحق للمورد</Badge>}
+          {balance > 0 && <Badge variant="destructive">{t('suppliers.dueBadge')}</Badge>}
         </CardContent>
       </Card>
 
       {isAdmin && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base font-semibold text-foreground">تسجيل دفعة للمورد</CardTitle>
+            <CardTitle className="text-base font-semibold text-foreground">{t('suppliers.recordPaymentTitle')}</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-wrap items-end gap-3">
             <div className="flex flex-col gap-1.5">
               <label htmlFor="amount" className="text-sm font-medium">
-                المبلغ
+                {t('common.amount')}
               </label>
               <Input
                 id="amount"
@@ -114,17 +124,21 @@ export default function SupplierDetailPage() {
             </div>
             <div className="flex flex-col gap-1.5">
               <label htmlFor="note" className="text-sm font-medium">
-                ملاحظة (اختياري)
+                {t('common.noteOptional')}
               </label>
               <Input id="note" value={note} onChange={(e) => setNote(e.target.value)} className="w-56" />
             </div>
             <Button
               type="button"
               disabled={!amount || paymentMutation.isPending}
-              onClick={() => paymentMutation.mutate()}
+              onClick={() => {
+                setPaymentError(null);
+                paymentMutation.mutate();
+              }}
             >
-              تسجيل الدفعة
+              {t('common.recordPaymentButton')}
             </Button>
+            {paymentError && <p className="w-full text-sm text-destructive">{paymentError}</p>}
           </CardContent>
         </Card>
       )}
@@ -132,27 +146,29 @@ export default function SupplierDetailPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base font-semibold text-foreground">آخر فواتير الشراء</CardTitle>
+            <CardTitle className="text-base font-semibold text-foreground">
+              {t('suppliers.recentPurchaseInvoicesTitle')}
+            </CardTitle>
           </CardHeader>
           <CardContent className="overflow-x-auto">
             {supplier.purchases.length === 0 && (
-              <p className="text-sm text-muted-foreground">لا توجد فواتير شراء بعد.</p>
+              <p className="text-sm text-muted-foreground">{t('common.noPurchaseInvoicesYet')}</p>
             )}
             {supplier.purchases.length > 0 && (
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border text-right text-muted-foreground">
-                    <th className="py-2 font-medium">رقم فاتورة المورد</th>
-                    <th className="py-2 font-medium">المجموع</th>
-                    <th className="py-2 font-medium">التاريخ</th>
+                    <th className="py-2 font-medium">{t('common.supplierInvoiceRefColumn')}</th>
+                    <th className="py-2 font-medium">{t('common.total')}</th>
+                    <th className="py-2 font-medium">{t('common.date')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {supplier.purchases.map((p) => (
                     <tr key={p.id} className="border-b border-border last:border-0">
                       <td className="py-2">{p.invoiceRef ?? '—'}</td>
-                      <td className="py-2">{formatCurrency(p.total)}</td>
-                      <td className="py-2 text-muted-foreground">{formatDateTime(p.date)}</td>
+                      <td className="py-2">{formatCurrency(p.total, locale)}</td>
+                      <td className="py-2 text-muted-foreground">{formatDateTime(p.date, locale)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -163,25 +179,27 @@ export default function SupplierDetailPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base font-semibold text-foreground">سجل الدفعات</CardTitle>
+            <CardTitle className="text-base font-semibold text-foreground">{t('common.paymentsHistoryTitle')}</CardTitle>
           </CardHeader>
           <CardContent className="overflow-x-auto">
-            {supplier.payments.length === 0 && <p className="text-sm text-muted-foreground">لا توجد دفعات بعد.</p>}
+            {supplier.payments.length === 0 && (
+              <p className="text-sm text-muted-foreground">{t('common.noPaymentsYet')}</p>
+            )}
             {supplier.payments.length > 0 && (
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border text-right text-muted-foreground">
-                    <th className="py-2 font-medium">المبلغ</th>
-                    <th className="py-2 font-medium">ملاحظة</th>
-                    <th className="py-2 font-medium">التاريخ</th>
+                    <th className="py-2 font-medium">{t('common.amount')}</th>
+                    <th className="py-2 font-medium">{t('common.note')}</th>
+                    <th className="py-2 font-medium">{t('common.date')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {supplier.payments.map((p) => (
                     <tr key={p.id} className="border-b border-border last:border-0">
-                      <td className="py-2">{formatCurrency(p.amount)}</td>
+                      <td className="py-2">{formatCurrency(p.amount, locale)}</td>
                       <td className="py-2 text-muted-foreground">{p.note ?? '—'}</td>
-                      <td className="py-2 text-muted-foreground">{formatDateTime(p.createdAt)}</td>
+                      <td className="py-2 text-muted-foreground">{formatDateTime(p.createdAt, locale)}</td>
                     </tr>
                   ))}
                 </tbody>

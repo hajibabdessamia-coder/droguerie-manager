@@ -9,6 +9,7 @@ const ADMIN = {
   role: 'ADMIN',
   isActive: true,
   passwordHash: 'hashed',
+  mustChangePassword: false,
 };
 
 const SELLER = { ...ADMIN, id: 'seller-1', role: 'SELLER' };
@@ -48,7 +49,13 @@ describe('AuthService', () => {
       const { service, audit } = buildService(ADMIN);
       const result = await service.login(ADMIN.email, 'correct-password');
       expect(result.accessToken).toBe('signed-token');
-      expect(result.user).toEqual({ id: ADMIN.id, name: ADMIN.name, email: ADMIN.email, role: ADMIN.role });
+      expect(result.user).toEqual({
+        id: ADMIN.id,
+        name: ADMIN.name,
+        email: ADMIN.email,
+        role: ADMIN.role,
+        mustChangePassword: ADMIN.mustChangePassword,
+      });
       expect(audit.log).toHaveBeenCalledWith(ADMIN.id, 'LOGIN', 'User', ADMIN.id);
     });
   });

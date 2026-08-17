@@ -12,7 +12,7 @@ async function main() {
   await prisma.user.upsert({
     where: { email: 'admin@pharma.local' },
     update: {},
-    create: { name: 'المدير العام', email: 'admin@pharma.local', passwordHash, role: 'ADMIN' },
+    create: { name: 'المدير العام', email: 'admin@pharma.local', passwordHash, role: 'ADMIN', mustChangePassword: true },
   });
 
   await prisma.storeSettings.upsert({

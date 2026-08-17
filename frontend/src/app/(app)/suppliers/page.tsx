@@ -12,13 +12,15 @@ import { useDebouncedValue } from '@/hooks/use-debounce';
 import { fetchSuppliers } from '@/lib/suppliers';
 import { cn, formatCurrency } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth-store';
+import { useLocale } from '@/i18n/locale-provider';
 
 export default function SuppliersPage() {
   const isAdmin = useAuthStore((s) => s.user?.role === 'ADMIN');
+  const { t, locale } = useLocale();
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search, 300);
 
-  const { data: suppliers, isLoading } = useQuery({
+  const { data: suppliers, isLoading, isError } = useQuery({
     queryKey: ['suppliers', debouncedSearch],
     queryFn: () => fetchSuppliers(debouncedSearch || undefined),
   });
@@ -27,13 +29,15 @@ export default function SuppliersPage() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">الموردون</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{suppliers ? `${suppliers.length} مورد` : '...'}</p>
+          <h1 className="text-2xl font-bold">{t('suppliers.pageTitle')}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {suppliers ? `${suppliers.length} ${t('suppliers.countSuffix')}` : '...'}
+          </p>
         </div>
         {isAdmin && (
           <Link href="/suppliers/new" className={buttonVariants({ size: 'default' })}>
             <Plus className="h-4 w-4" />
-            إضافة مورد
+            {t('suppliers.addSupplier')}
           </Link>
         )}
       </div>
@@ -41,12 +45,12 @@ export default function SuppliersPage() {
       <Card>
         <CardContent className="p-4">
           <div className="relative">
-            <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Search className="absolute end-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="بحث بالاسم..."
-              className="pr-9"
+              placeholder={t('common.searchByNamePlaceholder')}
+              className="pe-9"
             />
           </div>
         </CardContent>
@@ -57,10 +61,10 @@ export default function SuppliersPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/30 text-right text-muted-foreground">
-                <th className="px-4 py-3 font-medium">الاسم</th>
-                <th className="px-4 py-3 font-medium">الهاتف</th>
-                <th className="px-4 py-3 font-medium">العنوان</th>
-                <th className="px-4 py-3 font-medium">الرصيد</th>
+                <th className="px-4 py-3 font-medium">{t('common.name')}</th>
+                <th className="px-4 py-3 font-medium">{t('common.phone')}</th>
+                <th className="px-4 py-3 font-medium">{t('common.address')}</th>
+                <th className="px-4 py-3 font-medium">{t('common.balance')}</th>
               </tr>
             </thead>
             <tbody>
@@ -72,14 +76,21 @@ export default function SuppliersPage() {
                     </td>
                   </tr>
                 ))}
-              {!isLoading && suppliers?.length === 0 && (
+              {!isLoading && isError && (
                 <tr>
-                  <td colSpan={4} className="px-4 py-10 text-center text-muted-foreground">
-                    لا يوجد موردون مطابقون.
+                  <td colSpan={4} className="px-4 py-10 text-center text-destructive">
+                    {t('suppliers.loadError')}
                   </td>
                 </tr>
               )}
-              {suppliers?.map((s) => {
+              {!isLoading && !isError && suppliers?.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="px-4 py-10 text-center text-muted-foreground">
+                    {t('suppliers.emptyState')}
+                  </td>
+                </tr>
+              )}
+              {!isError && suppliers?.map((s) => {
                 const balance = Number(s.balance);
                 return (
                   <tr key={s.id} className="border-b border-border last:border-0 hover:bg-accent/40">
@@ -91,7 +102,7 @@ export default function SuppliersPage() {
                     <td className="px-4 py-3 text-muted-foreground">{s.phone ?? '—'}</td>
                     <td className="px-4 py-3 text-muted-foreground">{s.address ?? '—'}</td>
                     <td className={cn('px-4 py-3 font-medium', balance > 0 && 'text-destructive')}>
-                      {formatCurrency(s.balance)}
+                      {formatCurrency(s.balance, locale)}
                     </td>
                   </tr>
                 );

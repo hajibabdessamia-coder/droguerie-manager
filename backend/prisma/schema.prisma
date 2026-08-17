@@ -23,6 +23,7 @@ model User {
   passwordHash String
   role         String   @default("SELLER")
   isActive     Boolean  @default(true)
+  mustChangePassword Boolean @default(false) // يُجبر تغيير كلمة السر عند أول تسجيل دخول (يُستخدم لحساب الإدارة الافتراضي المزروع)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

@@ -11,8 +11,10 @@ import { Label } from '@/components/ui/label';
 import { fetchStoreSettings, updateStoreSettings } from '@/lib/store-settings';
 import { createBackup, deleteBackup, fetchBackups, openBackupsFolder, restoreBackup } from '@/lib/backup';
 import { formatDateTime } from '@/lib/utils';
+import { useLocale } from '@/i18n/locale-provider';
 
 export default function SettingsPage() {
+  const { t, locale } = useLocale();
   const queryClient = useQueryClient();
   const { data: settings } = useQuery({ queryKey: ['store-settings'], queryFn: fetchStoreSettings });
 
@@ -64,7 +66,7 @@ export default function SettingsPage() {
     },
     onError: (err) => {
       const message = isAxiosError(err) ? err.response?.data?.message : undefined;
-      setError(message ?? 'حدث خطأ أثناء الحفظ');
+      setError(message ?? t('common.genericSaveError'));
     },
   });
 
@@ -93,7 +95,11 @@ export default function SettingsPage() {
   });
 
   function handleDeleteBackup(id: string, createdAt: string) {
-    if (window.confirm(`هل تريد حذف النسخة الاحتياطية بتاريخ ${formatDateTime(createdAt)}؟`)) {
+    if (
+      window.confirm(
+        `${t('settings.deleteBackupConfirmPrefix')}${formatDateTime(createdAt, locale)}${t('common.deleteConfirmSuffix')}`,
+      )
+    ) {
       deleteBackupMutation.mutate(id);
     }
   }
@@ -101,7 +107,7 @@ export default function SettingsPage() {
   function handleRestoreBackup(id: string, createdAt: string) {
     if (
       window.confirm(
-        `هل تريد استعادة النسخة الاحتياطية بتاريخ ${formatDateTime(createdAt)}؟ سيُعاد تشغيل التطبيق وسيُستبدَل كل ما تغيّر بعد هذا التاريخ.`,
+        `${t('settings.restoreBackupConfirmPrefix')}${formatDateTime(createdAt, locale)}${t('settings.restoreBackupConfirmSuffix')}`,
       )
     ) {
       restoreBackupMutation.mutate(id);
@@ -110,33 +116,33 @@ export default function SettingsPage() {
 
   function formatSize(bytes: number | null) {
     if (!bytes) return '—';
-    return `${(bytes / (1024 * 1024)).toFixed(2)} م.ب.`;
+    return `${(bytes / (1024 * 1024)).toFixed(2)} ${t('settings.megabyteSuffix')}`;
   }
 
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-bold">إعدادات المحل</h1>
-        <p className="mt-1 text-sm text-muted-foreground">تظهر هذه المعلومات في رأس الفاتورة القانونية</p>
+        <h1 className="text-2xl font-bold">{t('nav.settings')}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">{t('settings.subtitle')}</p>
       </div>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-6">
         <Card>
           <CardContent className="grid grid-cols-1 gap-4 p-5 md:grid-cols-2">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="name">اسم المحل</Label>
+              <Label htmlFor="name">{t('settings.nameLabel')}</Label>
               <Input id="name" required value={name} onChange={(e) => setName(e.target.value)} />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="logoUrl">رابط الشعار (اختياري)</Label>
+              <Label htmlFor="logoUrl">{t('settings.logoUrlLabel')}</Label>
               <Input id="logoUrl" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="address">العنوان</Label>
+              <Label htmlFor="address">{t('common.address')}</Label>
               <Input id="address" value={address} onChange={(e) => setAddress(e.target.value)} />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="phone">الهاتف</Label>
+              <Label htmlFor="phone">{t('common.phone')}</Label>
               <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
             </div>
             <div className="flex flex-col gap-1.5">
@@ -156,7 +162,7 @@ export default function SettingsPage() {
               <Input id="patente" value={patente} onChange={(e) => setPatente(e.target.value)} />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="defaultTaxRate">نسبة الضريبة الافتراضية (TVA %)</Label>
+              <Label htmlFor="defaultTaxRate">{t('settings.defaultTaxRateLabel')}</Label>
               <Input
                 id="defaultTaxRate"
                 type="number"
@@ -170,20 +176,20 @@ export default function SettingsPage() {
         </Card>
 
         {error && <p className="text-sm text-destructive">{error}</p>}
-        {saved && <p className="text-sm text-primary">تم الحفظ بنجاح</p>}
+        {saved && <p className="text-sm text-primary">{t('settings.savedSuccess')}</p>}
 
         <div className="flex justify-end">
           <Button type="submit" disabled={mutation.isPending}>
-            {mutation.isPending ? 'جارٍ الحفظ...' : 'حفظ الإعدادات'}
+            {mutation.isPending ? t('common.saving') : t('settings.saveButton')}
           </Button>
         </div>
       </form>
 
       <div className="flex flex-col gap-4">
         <div>
-          <h2 className="text-xl font-bold">النسخ الاحتياطي والاستعادة</h2>
+          <h2 className="text-xl font-bold">{t('settings.backupSectionTitle')}</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            تُحفظ النسخ الاحتياطية محلياً على هذا الجهاز فقط
+            {t('settings.backupSubtitle')}
           </p>
         </div>
 
@@ -191,7 +197,7 @@ export default function SettingsPage() {
           <CardContent className="flex flex-col gap-4 p-5">
             {restoring ? (
               <p className="text-sm text-primary">
-                تتم استعادة النسخة الاحتياطية... سيُعاد تشغيل التطبيق تلقائياً خلال لحظات.
+                {t('settings.restoringInProgress')}
               </p>
             ) : (
               <>
@@ -201,31 +207,34 @@ export default function SettingsPage() {
                     onClick={() => createBackupMutation.mutate()}
                     disabled={createBackupMutation.isPending}
                   >
-                    {createBackupMutation.isPending ? 'جارٍ إنشاء نسخة...' : 'إنشاء نسخة احتياطية الآن'}
+                    {createBackupMutation.isPending ? t('settings.createBackupLoading') : t('settings.createBackupButton')}
                   </Button>
                   <Button type="button" variant="outline" onClick={() => openBackupsFolder()}>
-                    فتح مجلد النسخ الاحتياطية
+                    {t('settings.openBackupsFolderButton')}
                   </Button>
                 </div>
 
                 {createBackupMutation.isError && (
-                  <p className="text-sm text-destructive">تعذّر إنشاء النسخة الاحتياطية</p>
+                  <p className="text-sm text-destructive">{t('settings.createBackupError')}</p>
                 )}
                 {restoreBackupMutation.isError && (
-                  <p className="text-sm text-destructive">تعذّرت استعادة النسخة الاحتياطية</p>
+                  <p className="text-sm text-destructive">{t('settings.restoreBackupError')}</p>
+                )}
+                {deleteBackupMutation.isError && (
+                  <p className="text-sm text-destructive">{t('settings.deleteBackupError')}</p>
                 )}
 
                 <div className="flex flex-col divide-y divide-border">
                   {!backups?.length && (
-                    <p className="py-3 text-sm text-muted-foreground">لا توجد نسخ احتياطية بعد</p>
+                    <p className="py-3 text-sm text-muted-foreground">{t('settings.noBackupsYet')}</p>
                   )}
                   {backups?.map((backup) => (
                     <div key={backup.id} className="flex items-center justify-between gap-3 py-3">
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium">{formatDateTime(backup.createdAt)}</span>
+                          <span className="text-sm font-medium">{formatDateTime(backup.createdAt, locale)}</span>
                           <Badge variant={backup.status === 'SUCCESS' ? 'default' : 'destructive'}>
-                            {backup.status === 'SUCCESS' ? 'ناجحة' : 'فاشلة'}
+                            {backup.status === 'SUCCESS' ? t('settings.backupStatus.SUCCESS') : t('settings.backupStatus.FAILED')}
                           </Badge>
                         </div>
                         <span className="text-xs text-muted-foreground">{formatSize(backup.sizeBytes)}</span>
@@ -238,7 +247,7 @@ export default function SettingsPage() {
                           disabled={backup.status !== 'SUCCESS' || restoreBackupMutation.isPending}
                           onClick={() => handleRestoreBackup(backup.id, backup.createdAt)}
                         >
-                          استعادة
+                          {t('settings.restoreButton')}
                         </Button>
                         <Button
                           type="button"
@@ -247,7 +256,7 @@ export default function SettingsPage() {
                           disabled={deleteBackupMutation.isPending}
                           onClick={() => handleDeleteBackup(backup.id, backup.createdAt)}
                         >
-                          حذف
+                          {t('common.delete')}
                         </Button>
                       </div>
                     </div>

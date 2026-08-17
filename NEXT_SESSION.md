@@ -1,8 +1,42 @@
 # NEXT_SESSION.md
 
+**Stale notice (2026-08-17): most of this file describes the state as of the
+end of the Stage 2 session and is now outdated — Stage 3 and a Phase 11
+pre-release hardening pass have both since happened. See "Phase 11 update
+(2026-08-17)" near the top and the corresponding section in `HANDOFF.md` for
+what's actually current. The rest of this file is kept for historical
+context on Stage 0–2 reasoning.**
+
 Read this file first when resuming work on Droguerie Manager (Pharma Manager). It is
 current as of the end of the Stage 2 session. For full narrative context and exact
 reproduction commands, also read `HANDOFF.md` in this same directory.
+
+## Phase 11 update (2026-08-17) — read this first
+
+- HEAD is commit `b5a3302` ("Bump version to 1.0.0"), not `6b2a796`. Stage 3
+  (icon, backup/restore, portable-exe fix, hardening, Windows code signing)
+  is done, not "not started." Branch and the `v1.0.0` tag are still unpushed
+  to GitHub — ask before pushing.
+- **Backup/restore is implemented** (`backend/src/backup/backup.service.ts`,
+  `VACUUM INTO` snapshot + restore-pending marker + relaunch), contradicting
+  the "Remaining tasks (Stage 3, not started)" list below.
+- **Windows code signing is implemented** (self-signed dev certificate,
+  `electron/scripts/make-dev-cert.ps1` + `pack-win.js`) — was in fact required
+  just to get the packaged exe to launch at all (Windows Smart App Control
+  blocked the unsigned build). As of Phase 11, the signing password is no
+  longer hardcoded — it must be set via the `CSC_KEY_PASSWORD` environment
+  variable before running either script. Still self-signed, not a purchased
+  certificate — "unknown publisher" warnings remain for other machines.
+- **Portable exe no longer exists as a build target** — replaced by `zip`
+  (`electron/package.json` `build.win.target: ["nsis", "zip"]`); the "did not
+  launch within several minutes" issue below was the reason and is resolved.
+- **Default admin password is now enforced, not just documented**: seeded
+  admin has `mustChangePassword: true`; the app forces a password change via
+  the existing Account page before any other screen is usable.
+- Silent mutation/query/export error handling gaps found in a Phase 10 audit
+  were fixed in Phase 11 — see `HANDOFF.md`'s "Phase 11 — Pre-release
+  hardening" section for the full list.
+- Current version across all `package.json` files is `1.0.0`, not `0.1.0`.
 
 ## Current project status
 
@@ -17,6 +51,7 @@ Working tree is clean; everything described below is committed at:
 ```
 6b2a796  Stage 2: Electron desktop packaging (Windows installer verified, macOS prepared)
 ```
+**(Stale — see "Phase 11 update" above for the real current HEAD.)**
 
 ## Completed stages
 

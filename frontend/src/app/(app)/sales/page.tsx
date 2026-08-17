@@ -6,15 +6,19 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { fetchSales } from '@/lib/sales';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
+import { useLocale } from '@/i18n/locale-provider';
 
 export default function SalesPage() {
-  const { data: sales, isLoading } = useQuery({ queryKey: ['sales'], queryFn: fetchSales });
+  const { t, locale } = useLocale();
+  const { data: sales, isLoading, isError } = useQuery({ queryKey: ['sales'], queryFn: fetchSales });
 
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-bold">الفواتير المحفوظة</h1>
-        <p className="mt-1 text-sm text-muted-foreground">{sales ? `${sales.length} فاتورة بيع` : '...'}</p>
+        <h1 className="text-2xl font-bold">{t('nav.sales')}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {sales ? `${sales.length} ${t('sales.countSuffix')}` : '...'}
+        </p>
       </div>
 
       <Card>
@@ -22,10 +26,10 @@ export default function SalesPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/30 text-right text-muted-foreground">
-                <th className="px-4 py-3 font-medium">الفاتورة</th>
-                <th className="px-4 py-3 font-medium">الزبون</th>
-                <th className="px-4 py-3 font-medium">الإجمالي</th>
-                <th className="px-4 py-3 font-medium">التاريخ</th>
+                <th className="px-4 py-3 font-medium">{t('common.invoiceColumn')}</th>
+                <th className="px-4 py-3 font-medium">{t('common.customerLabel')}</th>
+                <th className="px-4 py-3 font-medium">{t('common.grandTotal')}</th>
+                <th className="px-4 py-3 font-medium">{t('common.date')}</th>
               </tr>
             </thead>
             <tbody>
@@ -37,23 +41,30 @@ export default function SalesPage() {
                     </td>
                   </tr>
                 ))}
-              {!isLoading && sales?.length === 0 && (
+              {!isLoading && isError && (
                 <tr>
-                  <td colSpan={4} className="px-4 py-10 text-center text-muted-foreground">
-                    لا توجد فواتير بيع بعد.
+                  <td colSpan={4} className="px-4 py-10 text-center text-destructive">
+                    {t('sales.loadError')}
                   </td>
                 </tr>
               )}
-              {sales?.map((sale) => (
+              {!isLoading && !isError && sales?.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="px-4 py-10 text-center text-muted-foreground">
+                    {t('sales.emptyState')}
+                  </td>
+                </tr>
+              )}
+              {!isError && sales?.map((sale) => (
                 <tr key={sale.id} className="border-b border-border last:border-0 hover:bg-accent/40">
                   <td className="px-4 py-3">
                     <Link href={`/sales/${sale.id}`} className="font-medium text-primary hover:underline">
                       {sale.invoiceNumber}
                     </Link>
                   </td>
-                  <td className="px-4 py-3">{sale.customer?.name ?? 'زبون عابر'}</td>
-                  <td className="px-4 py-3 font-medium">{formatCurrency(sale.total)}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{formatDateTime(sale.createdAt)}</td>
+                  <td className="px-4 py-3">{sale.customer?.name ?? t('common.walkInCustomer')}</td>
+                  <td className="px-4 py-3 font-medium">{formatCurrency(sale.total, locale)}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{formatDateTime(sale.createdAt, locale)}</td>
                 </tr>
               ))}
             </tbody>

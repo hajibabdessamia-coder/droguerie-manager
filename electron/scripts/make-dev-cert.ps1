@@ -11,7 +11,12 @@ $ErrorActionPreference = 'Stop'
 
 $subject = 'CN=Pharma Manager Desktop'
 $pfxPath = Join-Path $PSScriptRoot '..\resources\dev-signing-cert.pfx'
-$pfxPassword = 'PharmaManagerDevSigning2026'
+
+if (-not $env:CSC_KEY_PASSWORD) {
+  Write-Error "CSC_KEY_PASSWORD environment variable is not set. Set it to the password you want to protect the .pfx with, e.g.:`n  `$env:CSC_KEY_PASSWORD = '<a-strong-password>'`n  powershell -ExecutionPolicy Bypass -File scripts/make-dev-cert.ps1"
+  exit 1
+}
+$pfxPassword = $env:CSC_KEY_PASSWORD
 
 $existing = Get-ChildItem 'Cert:\CurrentUser\My' -CodeSigningCert | Where-Object { $_.Subject -eq $subject } | Select-Object -First 1
 

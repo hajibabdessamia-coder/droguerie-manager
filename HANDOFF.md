@@ -20,9 +20,25 @@ desktop app instead of resuming the cloud deployment. That pivot is what Stages
 
 ## Where things stand right now
 
-Branch `feature/sqlite-migration`, commit `6b2a796`, clean working tree. Stage 1
-and Stage 2 are both done, tested, and committed. Stage 3 has not started —
-explicitly paused per the user's instruction at the end of this session.
+**Updated 2026-08-17 — corrected during the Phase 11 pre-release hardening
+session; everything below this note in the rest of the file is historical
+narrative for Stage 0–2 and is still accurate as history, just no longer
+"current."**
+
+Branch `feature/sqlite-migration`, HEAD at commit `b5a3302` ("Bump version to
+1.0.0 for first public release"), tag `v1.0.0` points at the same commit.
+Stage 1, Stage 2, and Stage 3 (icon, backup/restore, portable-exe fix via
+`nsis`+`zip` win targets instead of the broken `portable` target, production
+hardening, Windows code signing with a self-signed dev certificate) are all
+done and were part of the `v1.0.0` tag. This branch has **not** been pushed to
+GitHub and the `v1.0.0` tag has not been pushed either — both remain local
+only, deliberately deferred, ask before pushing.
+
+A Phase 10 audit and Phase 11 pre-release hardening pass have since run on top
+of `v1.0.0` (uncommitted as of this note) — see "Phase 11 — Pre-release
+hardening" near the end of this file for exactly what changed. Frontend
+localization (Arabic/French, `frontend/src/i18n/`) is also in progress and
+uncommitted, predating and independent of Phase 11.
 
 ## Stage 1 — PostgreSQL → SQLite (full detail)
 
@@ -177,10 +193,11 @@ packaged app at all, which sidesteps needing to bundle the Prisma CLI.
 
 Credentials in the template: `admin@pharma.local` / `Admin@12345` — same values
 already used by the pre-existing dev seed (`backend/prisma/seed.ts`, untouched),
-reused deliberately rather than inventing new ones. **The customer must change
-this password after first login** via the app's existing change-password
-screen (`POST /auth/change-password`, already existed, nothing new built for
-this).
+reused deliberately rather than inventing new ones. **As of Phase 11, this is
+now enforced, not just documented**: the seeded admin has `mustChangePassword:
+true` (new `User.mustChangePassword` column), and `AuthGuard` on the frontend
+redirects to `/account` until the password is changed — see "Phase 11 —
+Pre-release hardening" below.
 
 ### Puppeteer / PDF generation
 
@@ -276,13 +293,14 @@ freshly deleted `%APPDATA%\Pharma Manager` folder, confirmed first-launch databa
 creation, login, full sale, invoice PDF via the bundled (not system) Chromium,
 image upload, frontend UI reachable — all correct.
 
-**Portable exe** (`electron/dist-builds/Pharma Manager 0.1.0.exe`): built without
-error, but did not finish launching within several minutes of testing (no
-backend.log ever appeared, no port ever opened). Likely NSIS's well-known
-slowness self-extracting hundreds of small files (Puppeteer's Chromium
-distribution) on every single launch, since portable mode re-extracts to a temp
-folder each time rather than once at install time. **Not verified working —
-say so if asked, don't claim it's fine.**
+**Portable exe** — this was a real Stage 2 finding, but is now historical only:
+Stage 3 diagnosed the root cause (NSIS's portable target unconditionally
+re-extracts its entire payload on every launch, with no caching option) and
+replaced the `portable` win target with `zip` (`electron/package.json`
+`build.win.target` is now `["nsis", "zip"]`). The zip requires one manual
+one-time extraction but is fast on every launch after that, same as the
+already-verified `win-unpacked` folder. There is no more "portable exe" build
+target in this repo.
 
 ## Full rebuild procedure (from a clean checkout, or after resetting deps)
 
@@ -362,6 +380,81 @@ a visible action on the remote repository.
 
 **New: CI**
 - `.github/workflows/build-mac.yml` — `workflow_dispatch` only, not triggered.
+
+## Phase 11 — Pre-release hardening (2026-08-17)
+
+A Phase 10 read-only QA audit (8 findings) was followed by a Phase 11
+implementation pass addressing the confirmed findings. Scope was explicitly
+Windows-only hardening — no macOS packaging changes, no trial/licensing system,
+no business-logic changes, no UI redesign, no new dependencies installed.
+
+1. **Default admin password (release blocker)** — `User.mustChangePassword`
+   (new Prisma column, migration `20260817054721_add_must_change_password`,
+   additive, non-destructive, applied via `prisma migrate deploy`). Only the
+   production-seeded admin (`backend/prisma/seed.production.ts`) is created
+   with it `true`; the dev seed (`seed.ts`) and any pre-existing user are
+   unaffected. `AuthService.login`/`changeEmail` now return the flag,
+   `changePassword` clears it on success. `AuthGuard` redirects any
+   authenticated user with the flag set to `/account`, on every route, until
+   they change their password via the existing change-password form (no new
+   page). **`electron/resources/db-template.sqlite` (the packaged app's
+   first-launch database template) is a gitignored build artifact and was
+   NOT regenerated this session** — it still predates this change and must be
+   rebuilt via `node electron/build-db-template.js` before the next Windows
+   package/build, or new installs will ship a template missing this column.
+2. **Signing password (release blocker)** — the literal signing certificate
+   password, previously hardcoded in `electron/scripts/pack-win.js` and
+   `electron/scripts/make-dev-cert.ps1`, is now read from the
+   `CSC_KEY_PASSWORD` environment variable in both places, with a clear
+   startup error (not a silent failure) if it's unset. Confirmed via
+   repository-wide grep that the old literal password string no longer exists
+   in any tracked file. Anyone rebuilding/re-signing must now set
+   `CSC_KEY_PASSWORD` themselves before running `pack-win.js` or
+   `make-dev-cert.ps1`.
+3. **Silent mutation errors** — 7 mutations (delete product, add/delete
+   customer payment/customer, add supplier payment, delete sale, delete
+   backup, stock adjustment) now surface failures via the existing
+   `isError`/`onError` + translated inline-message pattern already used
+   elsewhere (e.g. `dashboard/page.tsx`, `settings/page.tsx`'s backup
+   mutations). No toast library added.
+4. **Missing query error states** — the five list pages (products, customers,
+   suppliers, purchases, sales) now render a translated error row instead of a
+   silent empty table when their query fails, while preserving the existing
+   skeleton and empty-state behavior.
+5. **Export error handling** — PDF generation (`backend/src/reports/pdf.util.ts`)
+   and Excel generation (`backend/src/reports/excel.util.ts`) now catch
+   generation failures (including Puppeteer launch failures, relevant to the
+   packaged app's bundled-Chromium dependency) at their single choke point,
+   log the real error server-side via `Logger`, and throw a generic
+   `InternalServerErrorException` with no stack trace/paths/Puppeteer
+   internals in the response — this covers all 5 report exports and the sale
+   invoice PDF automatically. On the frontend, the 4 Excel-export buttons
+   (previously bare, unawaited `onClick` calls) and the sale invoice PDF
+   download are now `useMutation`-backed with visible translated error
+   feedback, matching the summary-PDF export's existing pattern.
+6. **i18n** — all new user-facing strings added to both
+   `frontend/src/i18n/dictionaries/ar.ts` and `fr.ts` in matching positions;
+   `fr.ts`'s `: Dictionary` type annotation makes any structural mismatch a
+   compile error, and `npx tsc --noEmit` was run to confirm parity.
+7. **Not done, flagged for awareness**: while auditing, discovered that
+   `backend/.gitignore`'s unanchored `Reports/` pattern (line 7) matches the
+   `backend/src/reports/` **source** directory too (case-insensitive on
+   Windows/git) — `git ls-files backend/src/reports/` returns zero files.
+   The entire reports/export module's source, including the files touched in
+   item 5 above, has **never been tracked by git**, since Stage 2. This is
+   pre-existing (not caused by Phase 11) and was left untouched per the
+   "don't fix things outside the stated scope" instruction for this session,
+   but it means a plain `git add -A` / `git status` will silently omit this
+   module. Needs a deliberate `.gitignore` fix (e.g. anchor the ignore to
+   `/Reports/` at the backend root) before the next commit.
+
+Validation performed: `npx tsc --noEmit` (frontend), `npx jest` (frontend,
+16/16 passing), `nest build` (backend, clean), `npm test` (backend, 24/24
+passing, including an updated `auth.service.spec.ts`), `prisma validate` +
+`prisma migrate status` (schema valid, migration applied, no drift), a
+row-count check across all major tables before/after the migration (no data
+loss), and a repo-wide grep confirming the old signing password is gone from
+tracked files. No packages were installed; no `package.json`/lockfile changed.
 
 ## What NOT to do without asking first
 

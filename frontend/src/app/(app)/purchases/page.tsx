@@ -9,23 +9,27 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { fetchPurchases } from '@/lib/purchases';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth-store';
+import { useLocale } from '@/i18n/locale-provider';
 
 export default function PurchasesPage() {
   const isAdmin = useAuthStore((s) => s.user?.role === 'ADMIN');
+  const { t, locale } = useLocale();
 
-  const { data: purchases, isLoading } = useQuery({ queryKey: ['purchases'], queryFn: fetchPurchases });
+  const { data: purchases, isLoading, isError } = useQuery({ queryKey: ['purchases'], queryFn: fetchPurchases });
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">المشتريات</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{purchases ? `${purchases.length} فاتورة شراء` : '...'}</p>
+          <h1 className="text-2xl font-bold">{t('purchases.pageTitle')}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {purchases ? `${purchases.length} ${t('purchases.countSuffix')}` : '...'}
+          </p>
         </div>
         {isAdmin && (
           <Link href="/purchases/new" className={buttonVariants({ size: 'default' })}>
             <Plus className="h-4 w-4" />
-            فاتورة شراء جديدة
+            {t('purchases.addNew')}
           </Link>
         )}
       </div>
@@ -35,10 +39,10 @@ export default function PurchasesPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/30 text-right text-muted-foreground">
-                <th className="px-4 py-3 font-medium">المورد</th>
-                <th className="px-4 py-3 font-medium">مرجع الفاتورة</th>
-                <th className="px-4 py-3 font-medium">الإجمالي</th>
-                <th className="px-4 py-3 font-medium">التاريخ</th>
+                <th className="px-4 py-3 font-medium">{t('purchases.supplierLabel')}</th>
+                <th className="px-4 py-3 font-medium">{t('purchases.invoiceRefColumn')}</th>
+                <th className="px-4 py-3 font-medium">{t('common.grandTotal')}</th>
+                <th className="px-4 py-3 font-medium">{t('common.date')}</th>
               </tr>
             </thead>
             <tbody>
@@ -50,14 +54,21 @@ export default function PurchasesPage() {
                     </td>
                   </tr>
                 ))}
-              {!isLoading && purchases?.length === 0 && (
+              {!isLoading && isError && (
                 <tr>
-                  <td colSpan={4} className="px-4 py-10 text-center text-muted-foreground">
-                    لا توجد فواتير شراء بعد.
+                  <td colSpan={4} className="px-4 py-10 text-center text-destructive">
+                    {t('purchases.loadError')}
                   </td>
                 </tr>
               )}
-              {purchases?.map((p) => (
+              {!isLoading && !isError && purchases?.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="px-4 py-10 text-center text-muted-foreground">
+                    {t('common.noPurchaseInvoicesYet')}
+                  </td>
+                </tr>
+              )}
+              {!isError && purchases?.map((p) => (
                 <tr key={p.id} className="border-b border-border last:border-0 hover:bg-accent/40">
                   <td className="px-4 py-3">
                     <Link href={`/purchases/${p.id}`} className="font-medium text-primary hover:underline">
@@ -65,8 +76,8 @@ export default function PurchasesPage() {
                     </Link>
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">{p.invoiceRef ?? '—'}</td>
-                  <td className="px-4 py-3 font-medium">{formatCurrency(p.total)}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{formatDateTime(p.date)}</td>
+                  <td className="px-4 py-3 font-medium">{formatCurrency(p.total, locale)}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{formatDateTime(p.date, locale)}</td>
                 </tr>
               ))}
             </tbody>
