@@ -52,6 +52,10 @@
       {
         "from": "resources/icon.png",
         "to": "icon.png"
+      },
+      {
+        "from": "resources/license-public-key.pem",
+        "to": "license-public-key.pem"
       }
     ],
     "win": {

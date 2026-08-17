@@ -82,9 +82,14 @@ export const ar = {
   },
   topbar: {
     logout: 'تسجيل الخروج',
+    trialRemainingPrefix: 'الفترة التجريبية:',
+    trialRemainingSuffix: 'يوم متبقٍ',
   },
   authGuard: {
     verifyingSession: 'جارٍ التحقق من الجلسة...',
+  },
+  licenseGate: {
+    verifying: 'جارٍ التحقق من الترخيص...',
   },
   themeToggle: {
     ariaLabel: 'تبديل المظهر',
@@ -392,5 +397,35 @@ export const ar = {
     exportSalesButton: 'المبيعات والأرباح',
     exportProductsButton: 'المنتجات والمخزون',
     exportError: 'تعذّر تصدير الملف.',
+  },
+  // مفاتيح شاشة الفترة التجريبية/تفعيل الترخيص (المرحلة 12)
+  activate: {
+    title: 'تفعيل الترخيص',
+    subtitle: 'هذا الجهاز يحتاج ترخيصاً صالحاً أو فترة تجريبية سارية لمتابعة الاستخدام',
+    status: {
+      trialActive: 'الفترة التجريبية سارية.',
+      trialExpired: 'انتهت الفترة التجريبية لهذا الجهاز.',
+      licensed: 'هذا الجهاز مرخَّص.',
+      licenseExpired: 'انتهت صلاحية الترخيص المسجَّل لهذا الجهاز.',
+      licenseInvalid: 'الترخيص المسجَّل غير صالح لهذا الجهاز.',
+    },
+    daysRemainingSuffix: 'يوم متبقٍ',
+    clockAnomalyWarning: 'تم رصد تغيير غير معتاد في ساعة النظام. تواصل مع البائع إن استمرت هذه الرسالة.',
+    deviceIdLabel: 'معرّف هذا الجهاز',
+    deviceIdCopied: 'تم نسخ المعرّف.',
+    deviceIdHelp: 'أرسل هذا المعرّف للبائع للحصول على ترخيص خاص بهذا الجهاز تحديداً.',
+    licenseKeyLabel: 'مفتاح الترخيص',
+    licenseKeyPlaceholder: 'الصق مفتاح الترخيص الذي استلمته من البائع هنا',
+    activationSuccess: 'تم تفعيل الترخيص بنجاح.',
+    activateLoading: 'جارٍ التفعيل...',
+    activateButton: 'تفعيل',
+    alreadyActiveNotice: 'يمكنك متابعة استخدام التطبيق بشكل طبيعي.',
+    errors: {
+      MALFORMED: 'مفتاح الترخيص غير صالح الصيغة.',
+      INVALID_SIGNATURE: 'مفتاح الترخيص غير صحيح.',
+      WRONG_DEVICE: 'هذا الترخيص صادر لجهاز آخر، وليس هذا الجهاز.',
+      EXPIRED: 'انتهت صلاحية هذا الترخيص.',
+      GENERIC: 'تعذّر تفعيل الترخيص.',
+    },
   },
 } as const;

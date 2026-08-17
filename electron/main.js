@@ -72,6 +72,14 @@ function iconPath() {
   return app.isPackaged ? path.join(RES_ROOT, 'icon.png') : path.join(__dirname, 'resources', 'icon.png');
 }
 
+// المفتاح العلني فقط (المرحلة 12 — التحقق من التراخيص) — المفتاح الخاص المطابق له
+// لا يوجد في هذا المشروع إطلاقاً، راجع license-tool/ في جذر المستودع
+function licensePublicKeyPath() {
+  return app.isPackaged
+    ? path.join(RES_ROOT, 'license-public-key.pem')
+    : path.join(__dirname, 'resources', 'license-public-key.pem');
+}
+
 function getFreePort() {
   return new Promise((resolve, reject) => {
     const server = net.createServer();
@@ -200,6 +208,7 @@ function startBackend({ dbPath, port, frontendPort, jwtSecret, userDataPath, log
     PUPPETEER_CACHE_DIR: puppeteerCacheDir(),
     STORAGE_PROVIDER: 'local',
     NODE_ENV: 'production',
+    LICENSE_PUBLIC_KEY_PATH: licensePublicKeyPath(),
   };
 
   rotateLogIfLarge(logPath);

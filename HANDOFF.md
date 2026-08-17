@@ -456,6 +456,87 @@ row-count check across all major tables before/after the migration (no data
 loss), and a repo-wide grep confirming the old signing password is gone from
 tracked files. No packages were installed; no `package.json`/lockfile changed.
 
+## Phase 12 — Offline 7-day trial & device-bound licensing (2026-08-17)
+
+Gates the whole application (including the login screen itself, not just the
+authenticated pages) behind a 7-day trial and, after that, a device-bound
+license — with **zero network dependency**, matching the app's fully offline
+architecture. No business logic touched; gating is centralized in one
+backend guard, not scattered across feature modules. No new npm dependency
+(Node's built-in `crypto` covers Ed25519 signing/verification; the device ID
+is read via `reg query` against the Windows registry, no `node-machine-id`
+package needed).
+
+- **New backend module** `backend/src/license/` — `AppLicense` Prisma model
+  (single row per install, additive migration
+  `20260817064205_add_app_license`), `LicenseService` (trial/license status,
+  activation), `device-id.util.ts` (Windows `MachineGuid` → SHA-256 → 16-hex
+  device ID), `license-crypto.util.ts` (Ed25519 verify), `trial-marker.util.ts`
+  + `trial-integrity.util.ts` (tamper-resistance, see below).
+- **Central gate**: a new `LicenseGuard` (`backend/src/auth/guards/`),
+  registered as the *first* global `APP_GUARD` in `app.module.ts` — runs
+  before `JwtAuthGuard`/`RolesGuard`, so a blocked device can't reach
+  `/auth/login` either. A separate `@LicensePublic()` decorator (distinct
+  from the existing `@Public()`, which only exempts JWT auth) exempts just
+  `/license/*` and `/health` (the latter needed so Electron's own startup
+  health-check in `electron/main.js` isn't blocked by an expired license).
+- **Crypto key custody**: Ed25519 keypair. The **public** key
+  (`electron/resources/license-public-key.pem`, committed, bundled via a new
+  `extraResources` entry) is the *only* key that ships in the app. The
+  **private** key lives only in the new top-level `license-tool/` directory
+  (never referenced by any packaging config, so it never ships;
+  `license-tool/.gitignore` keeps the generated key files out of git).
+  `license-tool/generate-keypair.js` is a one-time setup script;
+  `license-tool/generate-license.js --device-id <id> --days N` (or
+  `--perpetual`) is what the seller runs to issue a license for a specific
+  customer device — see `license-tool/README.md`.
+- **Frontend**: new root-level `frontend/src/app/activate/page.tsx` (device
+  ID display+copy, trial/expired status, license-key paste+activate), a new
+  `LicenseGate` component wrapping the entire app in `layout.tsx` (above
+  `AuthGuard`, same `usePathname()`-redirect pattern as the Phase 11
+  `mustChangePassword` gate), a trial-remaining-days badge in `topbar.tsx`,
+  and a `LICENSE_REQUIRED` branch in `api-client.ts`'s response interceptor
+  parallel to the existing 401 handling. New `activate.*` / `licenseGate.*` /
+  `topbar.trialRemaining*` keys in both `ar.ts` and `fr.ts`.
+- **Tamper resistance — and its honest limits**: (1) a persisted, forward-only
+  `trialHighWaterMark` defeats simple clock-rollback (rolling the clock back
+  cannot buy trial time — the last known time is used instead); (2) a
+  redundant marker file outside `userData` (under `%LOCALAPPDATA%\.pmts`)
+  means deleting/reinstalling to reset the SQLite database alone doesn't
+  reset the trial start date; (3) an HMAC over the trial row (keyed off the
+  device ID) catches casual edits made with a SQLite browser. **What this
+  does NOT protect against**: this is a fully offline product with no server
+  to be the source of truth — a sufficiently determined user who edits both
+  the database and the marker file, or reinstalls into a fresh OS profile,
+  can reset the trial. The **license** itself has real cryptographic
+  protection (a forged license is not possible without the private key,
+  regardless of what's edited on disk) — that boundary is solid. The
+  trial's protection is best-effort friction, not a guarantee, and is
+  documented as such rather than oversold.
+- **`db-template.sqlite` regenerated** this session (same procedure as
+  Phase 11's loose-end fix) and verified to contain zero `AppLicense` rows —
+  every new install starts its own independent 7-day clock.
+- **Post-review fix**: `license-crypto.util.ts`'s dev-only public-key fallback
+  (used only when `LICENSE_PUBLIC_KEY_PATH` isn't set) originally assumed a
+  fixed `../../../` depth from `__dirname`, which was correct for the
+  `backend/src/license` source layout but wrong for the compiled
+  `backend/dist/src/license` layout. Fixed with a `findRepoRoot()` directory
+  walk that works for both; covered by 3 new regression tests in
+  `license-crypto.util.spec.ts`.
+
+Validation performed: `nest build` + `npm test` (backend, 41/41 passing,
+17 license tests: trial init, 7-day expiration, clock-rollback
+detection, valid/invalid-signature/wrong-device/expired license
+verification, successful activation, persistence-across-restarts,
+wrong-device-license-in-DB rejection, plus 3 public-key path-resolution
+regression tests), `npx tsc --noEmit` + `npx jest`
+(frontend, 16/16 passing, i18n parity enforced by `fr.ts`'s `: Dictionary`
+annotation), `prisma validate` + `prisma migrate status`, a data-preservation
+row-count check across all tables before/after the migration (no data
+loss, confirmed via `dev.db` MD5 checksum unchanged across the template
+regeneration step), and confirmation that no `package.json`/lockfile
+changed anywhere in the repo (no new npm dependency was needed).
+
 ## What NOT to do without asking first
 
 - Don't push this branch or trigger the mac CI workflow — needs explicit confirmation.
@@ -465,3 +546,7 @@ tracked files. No packages were installed; no `package.json`/lockfile changed.
 - Don't swap Puppeteer for Electron's native PDF printing without confirming
   scope — it's the obvious next optimization but is a functional-layer change.
 - Don't assume the portable exe works — it's unverified, say so.
+- Don't lose `license-tool/private-key.pem` — it cannot be regenerated, and
+  losing it means no new licenses can ever be issued without shipping a new
+  public key (and thus invalidating every previously-issued license) to
+  every existing customer. It is gitignored by design; back it up offline.

@@ -315,3 +315,27 @@ model Alert {
   @@index([isRead])
   @@map("alerts")
 }
+
+// ============================================================
+// الترخيص والفترة التجريبية (المرحلة 12) — صف واحد فقط لكل تثبيت،
+// بنفس نمط StoreSettings (upsert بمعرّف ثابت "default")
+// ============================================================
+
+model AppLicense {
+  id                   String    @id @default(cuid())
+  // مرساة زمنية أحادية الاتجاه (لا تتراجع أبداً) تُستخدم لكشف إرجاع ساعة النظام
+  // للوراء لإطالة الفترة التجريبية — راجع license.service.ts
+  trialStartedAt       DateTime  @default(now())
+  trialHighWaterMark   DateTime  @default(now())
+  clockAnomalyDetected Boolean   @default(false)
+  // نص الترخيص الخام (base64url لِـ payload + signature) بعد التفعيل، فارغ أثناء الفترة التجريبية
+  licenseKey           String?
+  activatedAt          DateTime?
+  // HMAC على حقول الفترة التجريبية (بمفتاح مشتق من معرّف الجهاز) — يكشف تعديلاً
+  // يدوياً مباشراً على هذا الصف عبر أداة تصفح SQLite، وليس بديلاً عن توقيع الترخيص
+  integrityHash        String
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@map("app_license")
+}

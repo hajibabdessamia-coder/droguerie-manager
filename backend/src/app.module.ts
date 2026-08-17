@@ -17,8 +17,10 @@ import { UploadsModule } from './uploads/uploads.module';
 import { StoreSettingsModule } from './store-settings/store-settings.module';
 import { ReportsModule } from './reports/reports.module';
 import { BackupModule } from './backup/backup.module';
+import { LicenseModule } from './license/license.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
+import { LicenseGuard } from './auth/guards/license.guard';
 
 @Module({
   imports: [
@@ -39,8 +41,11 @@ import { RolesGuard } from './auth/guards/roles.guard';
     StoreSettingsModule,
     ReportsModule,
     BackupModule,
+    LicenseModule,
   ],
   providers: [
+    // الترتيب مهم: LicenseGuard أولاً حتى يُحجَب جهاز غير مرخَّص قبل أي فحص هوية
+    { provide: APP_GUARD, useClass: LicenseGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
   ],

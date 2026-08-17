@@ -1,10 +1,11 @@
 # NEXT_SESSION.md
 
 **Stale notice (2026-08-17): most of this file describes the state as of the
-end of the Stage 2 session and is now outdated — Stage 3 and a Phase 11
-pre-release hardening pass have both since happened. See "Phase 11 update
-(2026-08-17)" near the top and the corresponding section in `HANDOFF.md` for
-what's actually current. The rest of this file is kept for historical
+end of the Stage 2 session and is now outdated — Stage 3, a Phase 11
+pre-release hardening pass, and a Phase 12 licensing implementation have all
+since happened. See "Phase 11 update (2026-08-17)" and "Phase 12 update
+(2026-08-17)" near the top, and the corresponding sections in `HANDOFF.md`,
+for what's actually current. The rest of this file is kept for historical
 context on Stage 0–2 reasoning.**
 
 Read this file first when resuming work on Droguerie Manager (Pharma Manager). It is
@@ -37,6 +38,70 @@ reproduction commands, also read `HANDOFF.md` in this same directory.
   were fixed in Phase 11 — see `HANDOFF.md`'s "Phase 11 — Pre-release
   hardening" section for the full list.
 - Current version across all `package.json` files is `1.0.0`, not `0.1.0`.
+
+## Phase 12 update (2026-08-17) — read this next
+
+Phase 11 is committed at `5869cca` ("feat: complete Phase 11 hardening and
+error handling"), on top of `b5a3302`. **Phase 12 (offline 7-day trial +
+device-bound licensing) is implemented, reviewed, and validated, but is
+NOT YET COMMITTED** — it sits as modified/untracked files in the working
+tree on `feature/sqlite-migration`, same branch, still unpushed.
+
+What Phase 12 adds, in one paragraph: the whole application (including the
+login screen itself, not just the pages behind it) is now gated by a
+`LicenseGuard` — a new, single global NestJS guard checked before auth on
+every request. A fresh install gets a 7-day trial with no license needed.
+After that (or on a device with no valid license at all), every screen
+redirects to a new `/activate` page showing that device's ID and a
+license-key paste box. **Zero network calls anywhere in this feature** —
+verification is fully offline, using an Ed25519 signature (Node's built-in
+`crypto`, no new dependency). The seller issues a license for one specific
+customer device using a new, separate `license-tool/` directory at the repo
+root — this directory (and especially its `private-key.pem`, generated
+locally and gitignored) **never ships inside the packaged app**; only the
+matching public key (`electron/resources/license-public-key.pem`) is bundled.
+See `license-tool/README.md` for the seller workflow, and `HANDOFF.md`'s
+"Phase 12" section for the full architecture writeup (new `AppLicense`
+Prisma model/migration, `backend/src/license/`, the frontend `LicenseGate`/
+`/activate` page, new `ar.ts`/`fr.ts` keys).
+
+**Known limitations of the offline trial's tamper resistance (by design, not
+oversight — read before assuming this is bulletproof)**: the trial's
+protections (a forward-only clock anchor, a redundant marker file outside
+`userData`, an HMAC integrity check on the trial database row) raise the
+bar against *casual* reset (deleting the database, turning the clock back)
+but cannot stop a technically capable user in a fully offline product with
+no server to be the source of truth — and the HMAC specifically is keyed by
+the device ID, which is *intentionally shown on-screen* to the user for the
+activation workflow, so it only deters accidental/casual edits, not a
+deliberate one. The **license** itself does not share this weakness — Ed25519
+signature verification is solid regardless of what's edited on disk, because
+the private key never leaves `license-tool/`. Also found and fixed during
+review: a path-resolution bug in `license-crypto.util.ts`'s dev-only public-key
+fallback (fixed with a directory-walk, `findRepoRoot()`, that works for both
+the `backend/src/license` and `backend/dist/src/license` layouts — see its
+tests). `LicenseGate` (frontend) fails open on a persistent status-check
+error; this is intentional, since `LicenseGuard` (backend) remains the real
+enforcement boundary on every actual API call regardless of what the frontend
+gate does.
+
+**Validation as of this update**: backend `nest build` clean; `npm test`
+41/41 passing (17 license-specific: trial init, 7-day expiry, clock-rollback
+detection, valid/invalid-signature/wrong-device/expired verification,
+successful activation, persistence-across-restarts, wrong-device-license-in-DB
+rejection, plus 3 new regression tests for the path-resolution fix). Frontend
+`tsc --noEmit` clean (only the pre-existing, unrelated `button.test.tsx`
+typing error) and `jest` 16/16 passing. `prisma validate`/`migrate status`
+clean, migration additive only, `dev.db` MD5 checksum unchanged throughout
+(no data loss, nothing reset). No `package.json`/lockfile changed anywhere —
+no new npm dependency was needed. A read-only review of the full Phase 12
+diff found no exposed secrets, no unrelated business-logic changes, and no
+leakage of Phase 12 content into the still-uncommitted Phase 1–9
+localization files.
+
+**The next step is finishing Phase 12's own staging/review/commit — not
+starting Phase 13.** Nothing macOS-related, no CI/push, no auto-update, no
+trial/licensing redesign should happen until Phase 12 is actually committed.
 
 ## Current project status
 

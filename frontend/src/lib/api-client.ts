@@ -20,6 +20,11 @@ apiClient.interceptors.response.use(
         window.location.href = '/login';
       }
     }
+    if (error.response?.data?.code === 'LICENSE_REQUIRED') {
+      if (typeof window !== 'undefined' && window.location.pathname !== '/activate') {
+        window.location.href = '/activate';
+      }
+    }
     return Promise.reject(error);
   },
 );

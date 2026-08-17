@@ -74,9 +74,14 @@ export const fr: Dictionary = {
   },
   topbar: {
     logout: 'Déconnexion',
+    trialRemainingPrefix: "Essai gratuit :",
+    trialRemainingSuffix: 'jour(s) restant(s)',
   },
   authGuard: {
     verifyingSession: 'Vérification de la session...',
+  },
+  licenseGate: {
+    verifying: 'Vérification de la licence...',
   },
   themeToggle: {
     ariaLabel: 'Changer le thème',
@@ -367,5 +372,35 @@ export const fr: Dictionary = {
     exportSalesButton: 'Ventes et bénéfices',
     exportProductsButton: 'Produits et stock',
     exportError: "Impossible d'exporter le fichier.",
+  },
+  activate: {
+    title: 'Activation de la licence',
+    subtitle: "Cet appareil nécessite une licence valide ou une période d'essai active pour continuer",
+    status: {
+      trialActive: "La période d'essai est active.",
+      trialExpired: "La période d'essai de cet appareil a expiré.",
+      licensed: 'Cet appareil est sous licence.',
+      licenseExpired: 'La licence enregistrée pour cet appareil a expiré.',
+      licenseInvalid: "La licence enregistrée n'est pas valide pour cet appareil.",
+    },
+    daysRemainingSuffix: 'jour(s) restant(s)',
+    clockAnomalyWarning:
+      "Un changement inhabituel de l'horloge système a été détecté. Contactez le vendeur si ce message persiste.",
+    deviceIdLabel: 'Identifiant de cet appareil',
+    deviceIdCopied: 'Identifiant copié.',
+    deviceIdHelp: 'Envoyez cet identifiant au vendeur pour obtenir une licence spécifique à cet appareil.',
+    licenseKeyLabel: 'Clé de licence',
+    licenseKeyPlaceholder: 'Collez ici la clé de licence reçue du vendeur',
+    activationSuccess: 'Licence activée avec succès.',
+    activateLoading: 'Activation en cours...',
+    activateButton: 'Activer',
+    alreadyActiveNotice: "Vous pouvez continuer à utiliser l'application normalement.",
+    errors: {
+      MALFORMED: 'Format de clé de licence invalide.',
+      INVALID_SIGNATURE: 'Clé de licence incorrecte.',
+      WRONG_DEVICE: 'Cette licence a été émise pour un autre appareil.',
+      EXPIRED: 'Cette licence a expiré.',
+      GENERIC: "Impossible d'activer la licence.",
+    },
   },
 };
