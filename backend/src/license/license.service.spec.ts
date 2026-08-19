@@ -17,10 +17,14 @@ import * as deviceIdUtil from './device-id.util';
 import * as trialMarkerUtil from './trial-marker.util';
 
 const DEVICE_ID = 'device-under-test';
+// المُطابِق تماماً لِما ينتجه mock الخاص بـ formatDeviceIdForDisplay أدناه (.toUpperCase())
+// — هذا هو المعرّف "القانوني" الذي يجب أن يُوقَّع الترخيص باستخدامه بعد الإصلاح، تماماً
+// كما يظهر لصاحب الجهاز على شاشة التفعيل، وليس DEVICE_ID الخام الداخلي
+const CANONICAL_DEVICE_ID = DEVICE_ID.toUpperCase();
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 function makeLicenseKey(overrides: Partial<{ deviceId: string; issuedAt: string; expiresAt: string | null }> = {}) {
-  const payload = { deviceId: DEVICE_ID, issuedAt: new Date().toISOString(), expiresAt: null, ...overrides };
+  const payload = { deviceId: CANONICAL_DEVICE_ID, issuedAt: new Date().toISOString(), expiresAt: null, ...overrides };
   const signature = crypto.sign(null, Buffer.from(JSON.stringify(payload), 'utf-8'), privateKey);
   return Buffer.from(JSON.stringify({ payload, signature: signature.toString('base64') }), 'utf-8').toString('base64url');
 }
@@ -92,6 +96,29 @@ describe('LicenseService', () => {
     expect(prisma.appLicense.create).toHaveBeenCalledTimes(1);
     expect(status.state).toBe('TRIAL_ACTIVE');
     expect(status.remainingDays).toBe(7);
+  });
+
+  // يختبر تحديداً إصلاح ثغرة "عدم تطابق تنسيق معرّف الجهاز" المكتشفة أثناء اختبار
+  // القبول: كان الحقل المُوقَّع/المُتحقَّق منه هو الهاش الخام الداخلي (32 حرفاً)، بينما
+  // العميل لا يرى ولا ينسخ إلا القيمة المختصرة المعروضة (formatDeviceIdForDisplay) —
+  // فيفشل أي ترخيص صادر باستخدام المعرّف الذي يراه العميل فعلياً بخطأ WRONG_DEVICE
+  describe('canonical Device ID consistency (the value shown to the customer)', () => {
+    it('returns the exact same canonical Device ID from status that a license must be signed for', async () => {
+      const { service } = buildService(null);
+      const status = await service.getStatus();
+      expect(status.deviceId).toBe(CANONICAL_DEVICE_ID);
+    });
+
+    it('activates successfully when the license is signed with exactly the Device ID shown on the activation screen', async () => {
+      const { service } = buildService(null);
+      const shownStatus = await service.getStatus();
+      // لا يعتمد هذا الاختبار على أي ثابت مُفترَض مسبقاً — يوقّع الترخيص بالضبط بالقيمة
+      // التي أعادتها getStatus() فعلياً، تماماً كما يفعل بائع حقيقي ينسخ ما يظهر للعميل
+      const key = makeLicenseKey({ deviceId: shownStatus.deviceId });
+      const activated = await service.activate(key);
+      expect(activated.state).toBe('LICENSED');
+      expect(activated.deviceId).toBe(shownStatus.deviceId);
+    });
   });
 
   it('reports TRIAL_EXPIRED once 7 days have elapsed since trialStartedAt', async () => {

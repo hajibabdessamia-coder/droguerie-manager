@@ -43,9 +43,12 @@ reproduction commands, also read `HANDOFF.md` in this same directory.
 
 Phase 11 is committed at `5869cca` ("feat: complete Phase 11 hardening and
 error handling"), on top of `b5a3302`. **Phase 12 (offline 7-day trial +
-device-bound licensing) is implemented, reviewed, and validated, but is
-NOT YET COMMITTED** — it sits as modified/untracked files in the working
-tree on `feature/sqlite-migration`, same branch, still unpushed.
+device-bound licensing) is now committed at `17e7ea5`** ("feat: add offline
+7-day trial and device-bound licensing"), same branch
+(`feature/sqlite-migration`), still unpushed. Real acceptance testing done
+after that commit found two bugs, both fixed in the working tree on top of
+`17e7ea5` — see "Phase 12 post-commit fixes and acceptance testing" below.
+**Those two fixes are NOT YET COMMITTED.**
 
 What Phase 12 adds, in one paragraph: the whole application (including the
 login screen itself, not just the pages behind it) is now gated by a
@@ -99,9 +102,72 @@ diff found no exposed secrets, no unrelated business-logic changes, and no
 leakage of Phase 12 content into the still-uncommitted Phase 1–9
 localization files.
 
-**The next step is finishing Phase 12's own staging/review/commit — not
-starting Phase 13.** Nothing macOS-related, no CI/push, no auto-update, no
-trial/licensing redesign should happen until Phase 12 is actually committed.
+## Phase 12 post-commit fixes and acceptance testing (2026-08-19) — read this too
+
+Real acceptance testing (running an actual dev backend/frontend against the
+real `backend/prisma/dev.db`, not just the automated suite) found two bugs
+in the Phase 12 implementation committed at `17e7ea5`. Both are fixed in the
+working tree on top of that commit, **but neither fix is committed yet**:
+
+1. **`LicenseController` was unreachable without a JWT.** It carried
+   `@LicensePublic()` (exempts `LicenseGuard`) but not `@Public()` (exempts
+   `JwtAuthGuard`), so `GET /license/status` and `POST /license/activate`
+   both returned `401` for anyone without a token. Since `LicenseGuard` also
+   blocks `/auth/login` once the trial/license is invalid, a genuinely
+   locked-out device could never obtain a JWT and therefore could never
+   reach either endpoint to see its Device ID or activate a purchased
+   license — a permanent lockout defeating the entire purpose of the
+   `/activate` page. Fixed by adding `@Public()` alongside the existing
+   `@LicensePublic()` on `LicenseController`
+   (`backend/src/license/license.controller.ts`), scoped to exactly those
+   two endpoints (that controller has no others).
+2. **Device ID format mismatch made every real license fail with
+   `WRONG_DEVICE`.** `getStatus()`/`activate()` in
+   `backend/src/license/license.service.ts` signed and verified against the
+   raw, internal 32-hex-char `getDeviceId()` output, but the *only* Device ID
+   a customer (or the seller, per `license-tool/README.md`) ever sees is the
+   16-hex-char dashed display format (`formatDeviceIdForDisplay()`). A
+   license generated from the displayed ID could never activate. Fixed by
+   introducing a `licenseDeviceId = formatDeviceIdForDisplay(deviceId)` used
+   only for the two `verifyLicenseKey()` calls and the `deviceId` field
+   returned to the client — the raw ID is still used, unchanged, for
+   trial-integrity (`computeIntegrityHash`/`readOrInitTrialMarker`), so the
+   pre-existing `AppLicense` row's stored integrity hash was not invalidated
+   by this fix.
+
+Both fixes are minimal and backend-only — no frontend file changed for
+either one.
+
+**Real end-to-end validation performed after both fixes** (against the
+actual `backend/prisma/dev.db`, real device ID `BD5A-960C-E803-AE98`):
+generated a real 30-day license via `license-tool/generate-license.js`
+using the exact Device ID as displayed by the running app; `POST
+/license/activate` returned `LICENSED`; `GET /license/status` confirmed
+`LICENSED`; the backend dev process was fully killed and restarted (not
+just a `--watch` hot-reload) and `LICENSED` persisted, with the same
+`AppLicense` row (`id` unchanged, just updated — not recreated). Negative
+tests: a license signed for a different, made-up Device ID was rejected
+with `WRONG_DEVICE`; an already-expired license (signed with the real
+private key, correct device, past `expiresAt`) was rejected with `EXPIRED`.
+In both cases the existing valid `LICENSED` state and the row's
+`licenseKey`/`activatedAt`/`integrityHash` were confirmed unchanged — a
+rejected activation never writes to the database.
+
+**Automated validation after both fixes**: backend `npm test` 43/43 passing
+(was 41/41 — 2 new unit tests in `license.service.spec.ts` proving the
+displayed Device ID round-trips through activation); a new
+`backend/test/license-access.e2e-spec.ts` (7/7 passing) boots the real
+`AppModule` with `LicenseService` mocked, proving against the real guard
+wiring that `/license/status` and `/license/activate` are reachable with no
+Authorization header both while trial-active and while trial-expired, that
+`/api/products` still requires a token, and that `/auth/login` and
+`/api/products` both still get blocked by `LicenseGuard` when the
+trial/license is expired. `npx tsc --noEmit` clean.
+
+**The next step is staging and committing these two fixes — not starting
+Phase 13.** Nothing macOS-related, no CI/push, no auto-update, no
+trial/licensing redesign should happen until Phase 12 (base commit + these
+fixes) is fully committed.
 
 ## Current project status
 

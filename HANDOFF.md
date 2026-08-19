@@ -537,6 +537,126 @@ loss, confirmed via `dev.db` MD5 checksum unchanged across the template
 regeneration step), and confirmation that no `package.json`/lockfile
 changed anywhere in the repo (no new npm dependency was needed).
 
+## Phase 12 post-commit fixes and acceptance testing (2026-08-19)
+
+Phase 12 above is committed at `17e7ea5`. Real acceptance testing performed
+after that commit — running an actual dev backend (`npm run start:dev`) and
+frontend (`npm run dev`) against the real `backend/prisma/dev.db`, not just
+the automated test suite — found two bugs. Both are fixed in the working
+tree on top of `17e7ea5`, **but neither fix is committed yet**; they exist
+only as modified files (`backend/src/license/license.controller.ts`,
+`backend/src/license/license.service.ts`, `backend/src/license/license.service.spec.ts`)
+plus one new file (`backend/test/license-access.e2e-spec.ts`).
+
+1. **`LicenseController` was unreachable without a JWT (found while
+   verifying the Device ID actually displays on `/activate`).** The
+   controller carried `@LicensePublic()` (exempts `LicenseGuard`, described
+   above) but not the separate `@Public()` decorator (exempts
+   `JwtAuthGuard`). Both `GET /license/status` and `POST /license/activate`
+   therefore still hit `JwtAuthGuard` and returned `401` for any caller
+   without a token — exactly the caller `/activate` exists to serve. Worse,
+   because `LicenseGuard` also blocks `/auth/login` once the trial/license
+   state is anything other than `TRIAL_ACTIVE`/`LICENSED`, a genuinely
+   locked-out device could never obtain a JWT through any path, and so could
+   never reach `/license/status` or `/license/activate` either — a
+   **permanent lockout** with no way to see the Device ID or paste in a
+   purchased license. This was completely masked during the original Phase
+   12 validation because the trial was still active and login still worked
+   in every test run. **Fix**: added `@Public()` alongside the existing
+   `@LicensePublic()` on the `LicenseController` class
+   (`backend/src/license/license.controller.ts`). Scoped correctly because
+   that controller has exactly two routes, both of which are meant to be
+   fully public; no other controller was touched.
+2. **Device ID format mismatch made every real license fail with
+   `WRONG_DEVICE` (found during the first real activation attempt with a
+   license-tool-generated key).** `device-id.util.ts` has always had two
+   different representations: `getDeviceId()` returns a raw, internal
+   32-hex-char SHA-256-derived string (used nowhere in the UI), and
+   `formatDeviceIdForDisplay()` derives a 16-hex-char dashed uppercase
+   string from it (e.g. `BD5A-960C-E803-AE98`) — the *only* one ever shown
+   on `/activate`, and the one `license-tool/README.md` explicitly instructs
+   the seller to collect from the customer. `LicenseService.getStatus()`
+   and `.activate()` were signing/verifying against the **raw** value, not
+   the displayed one, so a license generated from the Device ID a real
+   customer can actually see or copy was rejected with `WRONG_DEVICE` every
+   time — the licensing feature was non-functional end-to-end for any real
+   customer. **Fix**, scoped to `backend/src/license/license.service.ts`
+   only: both `getStatus()` and `activate()` now compute
+   `licenseDeviceId = formatDeviceIdForDisplay(deviceId)` and pass that (not
+   the raw `deviceId`) into `verifyLicenseKey()`, and return it as the
+   `deviceId` field in `LicenseStatus`. The raw `deviceId` is still used,
+   completely unchanged, for `getOrCreateRow()`,
+   `computeIntegrityHash()`, and `readOrInitTrialMarker()` — i.e. trial
+   tamper-resistance keying was deliberately left alone, both because it was
+   out of scope and because changing it would have invalidated the
+   `integrityHash` already stored in the live `AppLicense` row (recomputing
+   that hash under a new device-ID representation would have made an
+   untouched, legitimate trial row look tampered). `device-id.util.ts`,
+   `license-crypto.util.ts`, `trial-integrity.util.ts`,
+   `trial-marker.util.ts`, and `license-tool/generate-license.js` were not
+   changed at all — the mismatch was entirely in which of the two existing
+   representations `license.service.ts` fed into signing/verification.
+
+Both fixes are minimal, backend-only, and additive to the existing design —
+no schema change, no new dependency, no change to the Ed25519 keypair or its
+custody (`license-tool/private-key.pem` was reused as-is, not regenerated),
+no frontend file needed to change for either fix.
+
+**Real end-to-end validation performed after both fixes**, against the
+actual development database (`backend/prisma/dev.db`) and the real Device ID
+of this machine (`BD5A-960C-E803-AE98`):
+- Generated a genuine 30-day license via
+  `license-tool/generate-license.js --device-id BD5A-960C-E803-AE98 --days 30`,
+  using the exact string the running app displayed on `/activate` — not an
+  internal/raw ID obtained through any side channel.
+- `POST /api/license/activate` with that license returned
+  `{"state":"LICENSED",...}` (`201`).
+- `GET /api/license/status` confirmed `LICENSED` immediately after.
+- The backend dev process was killed outright (all of the `npm`/`nest`/
+  `node` PIDs in the watch chain, not just a `--watch` hot-reload) and
+  restarted fresh with `npm run start:dev`; `GET /api/license/status`
+  still returned `LICENSED` afterward.
+- The `AppLicense` row was inspected directly (read-only, via a throwaway
+  Prisma query) before and after every step: it is the **same row**
+  (`id: cmszni6680000t587xitkrd3h`) throughout this entire testing history —
+  never recreated, never reset — with `licenseKey`/`activatedAt` populated
+  once at activation and unchanged since.
+- **Negative tests**: (a) a license signed with the real private key for a
+  deliberately different, made-up Device ID was rejected with
+  `{"code":"WRONG_DEVICE"}`; (b) an already-expired license — constructed
+  with the same payload shape and the real private key, correct device ID,
+  `expiresAt` one day in the past (necessary because
+  `generate-license.js` only supports future `--days`/`--perpetual`, no
+  past-dated option) — was rejected with `{"code":"EXPIRED"}`. In both
+  cases, `GET /api/license/status` still reported the existing `LICENSED`
+  state immediately after, and the `AppLicense` row's
+  `licenseKey`/`activatedAt`/`integrityHash` were confirmed byte-for-byte
+  unchanged — a rejected `activate()` call throws before any database write,
+  so a failed attempt cannot disturb a valid, already-activated license.
+
+**Automated validation after both fixes**: backend `npm test` 43/43 passing
+(was 41/41 before this session — two new tests added to
+`license.service.spec.ts`: one asserting `getStatus()`'s returned `deviceId`
+equals the canonical formatted value, one proving a license signed with
+exactly that returned value activates to `LICENSED`). A new file,
+`backend/test/license-access.e2e-spec.ts` (7 tests, all passing), boots the
+real `AppModule` — real `LicenseGuard`, real `JwtAuthGuard`, real decorators
+on the real `LicenseController` — with only `LicenseService` overridden by a
+controllable mock (so it never touches the real `AppLicense` row), and
+proves: `/license/status` and `/license/activate` are reachable with no
+`Authorization` header both while `TRIAL_ACTIVE` and while `TRIAL_EXPIRED`
+(this is the exact bug from fix #1); an unrelated business endpoint
+(`/api/products`) still requires a token in both states; and `/auth/login`
+plus `/api/products` are both still correctly blocked by `LicenseGuard` with
+`{"code":"LICENSE_REQUIRED"}` when the mocked state is `TRIAL_EXPIRED` (this
+is the exact scenario fix #1 was written to unblock, now verified it still
+gates correctly). `npx tsc --noEmit` clean.
+
+**Next step**: stage and commit these two fixes on top of `17e7ea5` (file
+list above) — not yet done as of this note. Nothing macOS-related, no
+CI/push, no auto-update, no further trial/licensing redesign, and no Phase
+13 work should start before that.
+
 ## What NOT to do without asking first
 
 - Don't push this branch or trigger the mac CI workflow — needs explicit confirmation.

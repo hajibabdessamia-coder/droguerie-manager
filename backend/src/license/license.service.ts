@@ -48,6 +48,12 @@ export class LicenseService {
 
   async getStatus(): Promise<LicenseStatus> {
     const deviceId = this.resolveDeviceId();
+    // المعرّف القانوني لربط الترخيص هو بالضبط القيمة المختصرة المعروضة للعميل على شاشة
+    // التفعيل — وليس هاش الجهاز الخام الداخلي — لأنها القيمة الوحيدة التي يراها العميل
+    // وينسخها للبائع؛ ترخيص مُوقَّع بأي قيمة غير هذه لن يُطابق أبداً (كان هذا هو سبب
+    // فشل كل تفعيل حقيقي). سلامة الفترة التجريبية (integrityHash/marker أدناه) تبقى
+    // مربوطة بالهاش الخام كما كانت — لم يتغيّر إلا ربط الترخيص نفسه
+    const licenseDeviceId = formatDeviceIdForDisplay(deviceId);
     const row = await this.getOrCreateRow(deviceId);
 
     // فحص سلامة الصف: تعديل مباشر عبر أداة تصفح SQLite (مثال: تغيير trialStartedAt
@@ -96,19 +102,17 @@ export class LicenseService {
       data: { ...updatedFields, integrityHash: newIntegrityHash },
     });
 
-    const displayDeviceId = formatDeviceIdForDisplay(deviceId);
-
     if (row.licenseKey) {
-      const result = verifyLicenseKey(row.licenseKey, deviceId);
+      const result = verifyLicenseKey(row.licenseKey, licenseDeviceId);
       if (result.ok) {
-        return { state: 'LICENSED', deviceId: displayDeviceId, clockAnomalyDetected };
+        return { state: 'LICENSED', deviceId: licenseDeviceId, clockAnomalyDetected };
       }
       // ترخيص مخزَّن لكن غير صالح: إمّا انتهت صلاحيته، أو تالف/تعديل، أو (الأخطر) صف
       // قاعدة بيانات مُنسوخ من جهاز آخر يحمل ترخيصاً لا يخص هذا الجهاز — في كل الحالات
       // لا يُسمح بالرجوع لحالة "فترة تجريبية جديدة"، بل يُحجب التطبيق صراحة
       return {
         state: result.reason === 'EXPIRED' ? 'LICENSE_EXPIRED' : 'LICENSE_INVALID',
-        deviceId: displayDeviceId,
+        deviceId: licenseDeviceId,
         clockAnomalyDetected,
       };
     }
@@ -118,14 +122,15 @@ export class LicenseService {
     return {
       state: expired ? 'TRIAL_EXPIRED' : 'TRIAL_ACTIVE',
       remainingDays: expired ? 0 : Math.max(0, Math.ceil(remainingMs / DAY_MS)),
-      deviceId: displayDeviceId,
+      deviceId: licenseDeviceId,
       clockAnomalyDetected,
     };
   }
 
   async activate(rawLicenseKey: string): Promise<LicenseStatus> {
     const deviceId = this.resolveDeviceId();
-    const result = verifyLicenseKey(rawLicenseKey, deviceId);
+    const licenseDeviceId = formatDeviceIdForDisplay(deviceId);
+    const result = verifyLicenseKey(rawLicenseKey, licenseDeviceId);
     if (!result.ok) {
       throw new BadRequestException({ code: result.reason });
     }
