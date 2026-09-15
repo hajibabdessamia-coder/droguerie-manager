@@ -2,14 +2,15 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReportPeriod } from './dto/report-query.dto';
 import { buildExcelBuffer } from './excel.util';
-import { getPeriodRange, PERIOD_LABEL } from './period.util';
-import { buildSummaryReportHtml, renderPdfFromHtml } from './pdf.util';
+import { getPeriodRange, getPeriodLabel } from './period.util';
+import { buildSummaryReportHtml, invoiceWalkInCustomerLabel, renderPdfFromHtml, type InvoiceLocale } from './pdf.util';
+import { REPORT_LABELS } from './report-labels';
 
 @Injectable()
 export class ReportsService {
   constructor(private prisma: PrismaService) {}
 
-  async getSummary(period: ReportPeriod, dateStr?: string) {
+  async getSummary(period: ReportPeriod, dateStr?: string, locale: InvoiceLocale = 'ar') {
     const { start, end } = getPeriodRange(period, dateStr);
 
     const [sales, purchasesAgg, activeProducts] = await Promise.all([
@@ -53,7 +54,7 @@ export class ReportsService {
 
     return {
       period,
-      periodLabel: PERIOD_LABEL[period],
+      periodLabel: getPeriodLabel(period, locale),
       start,
       end,
       salesTotal,
@@ -66,13 +67,15 @@ export class ReportsService {
     };
   }
 
-  async exportSummaryPdf(period: ReportPeriod, dateStr?: string): Promise<Buffer> {
-    const report = await this.getSummary(period, dateStr);
-    const html = buildSummaryReportHtml(report);
+  async exportSummaryPdf(period: ReportPeriod, dateStr?: string, locale: InvoiceLocale = 'ar'): Promise<Buffer> {
+    const report = await this.getSummary(period, dateStr, locale);
+    const html = buildSummaryReportHtml(report, locale);
     return renderPdfFromHtml(html);
   }
 
-  async exportSalesExcel(from?: Date, to?: Date): Promise<Buffer> {
+  async exportSalesExcel(from?: Date, to?: Date, locale: InvoiceLocale = 'ar'): Promise<Buffer> {
+    const l = REPORT_LABELS[locale];
+    const dateLocale = locale === 'ar' ? 'ar-MA' : 'fr-FR';
     const sales = await this.prisma.sale.findMany({
       where: from || to ? { createdAt: { gte: from, lte: to } } : undefined,
       include: {
@@ -88,37 +91,39 @@ export class ReportsService {
       const profit = Number(sale.subtotal) - Number(sale.discount) - cost;
       return {
         invoiceNumber: sale.invoiceNumber,
-        date: sale.createdAt.toLocaleString('ar-MA'),
-        customer: sale.customer?.name ?? 'زبون عابر',
+        date: sale.createdAt.toLocaleString(dateLocale),
+        customer: sale.customer?.name ?? invoiceWalkInCustomerLabel(locale),
         seller: sale.seller.name,
         subtotal: Number(sale.subtotal),
         discount: Number(sale.discount),
         tax: Number(sale.taxAmount),
         total: Number(sale.total),
         profit,
-        paymentMethod: sale.paymentMethod === 'CASH' ? 'نقدي' : 'على الحساب',
+        paymentMethod: l.paymentMethod[sale.paymentMethod as 'CASH' | 'CREDIT'],
       };
     });
 
     return buildExcelBuffer(
-      'المبيعات',
+      l.sales.sheetTitle,
       [
-        { header: 'رقم الفاتورة', key: 'invoiceNumber', width: 20 },
-        { header: 'التاريخ', key: 'date', width: 20 },
-        { header: 'الزبون', key: 'customer', width: 20 },
-        { header: 'البائع', key: 'seller', width: 18 },
-        { header: 'المجموع الفرعي', key: 'subtotal', width: 15 },
-        { header: 'الخصم', key: 'discount', width: 12 },
-        { header: 'الضريبة', key: 'tax', width: 12 },
-        { header: 'الإجمالي', key: 'total', width: 15 },
-        { header: 'الربح', key: 'profit', width: 15 },
-        { header: 'طريقة الدفع', key: 'paymentMethod', width: 15 },
+        { header: l.sales.invoiceNumber, key: 'invoiceNumber', width: 20 },
+        { header: l.sales.date, key: 'date', width: 20 },
+        { header: l.sales.customer, key: 'customer', width: 20 },
+        { header: l.sales.seller, key: 'seller', width: 18 },
+        { header: l.sales.subtotal, key: 'subtotal', width: 15 },
+        { header: l.sales.discount, key: 'discount', width: 12 },
+        { header: l.sales.tax, key: 'tax', width: 12 },
+        { header: l.sales.total, key: 'total', width: 15 },
+        { header: l.sales.profit, key: 'profit', width: 15 },
+        { header: l.sales.paymentMethod, key: 'paymentMethod', width: 15 },
       ],
       rows,
+      locale,
     );
   }
 
-  async exportProductsExcel(): Promise<Buffer> {
+  async exportProductsExcel(locale: InvoiceLocale = 'ar'): Promise<Buffer> {
+    const l = REPORT_LABELS[locale];
     const products = await this.prisma.product.findMany({
       where: { isActive: true },
       include: { manufacturer: true },
@@ -138,46 +143,50 @@ export class ReportsService {
     }));
 
     return buildExcelBuffer(
-      'المنتجات والمخزون',
+      l.products.sheetTitle,
       [
-        { header: 'اسم المنتج', key: 'name', width: 25 },
-        { header: 'الكود الداخلي', key: 'internalCode', width: 15 },
-        { header: 'الشركة المصنعة', key: 'manufacturer', width: 18 },
-        { header: 'سعر الشراء', key: 'purchasePrice', width: 12 },
-        { header: 'سعر التقسيط', key: 'retailPrice', width: 12 },
-        { header: 'سعر الجملة', key: 'wholesalePrice', width: 12 },
-        { header: 'الكمية', key: 'quantity', width: 10 },
-        { header: 'الحد الأدنى', key: 'minStock', width: 12 },
-        { header: 'قيمة المخزون', key: 'inventoryValue', width: 15 },
+        { header: l.products.name, key: 'name', width: 25 },
+        { header: l.products.internalCode, key: 'internalCode', width: 15 },
+        { header: l.products.manufacturer, key: 'manufacturer', width: 18 },
+        { header: l.products.purchasePrice, key: 'purchasePrice', width: 12 },
+        { header: l.products.retailPrice, key: 'retailPrice', width: 12 },
+        { header: l.products.wholesalePrice, key: 'wholesalePrice', width: 12 },
+        { header: l.products.quantity, key: 'quantity', width: 10 },
+        { header: l.products.minStock, key: 'minStock', width: 12 },
+        { header: l.products.inventoryValue, key: 'inventoryValue', width: 15 },
       ],
       rows,
+      locale,
     );
   }
 
-  async exportCustomersExcel(): Promise<Buffer> {
+  async exportCustomersExcel(locale: InvoiceLocale = 'ar'): Promise<Buffer> {
+    const l = REPORT_LABELS[locale];
     const customers = await this.prisma.customer.findMany({ orderBy: { name: 'asc' } });
     const rows = customers.map((c) => ({
       name: c.name,
       phone: c.phone ?? '',
       address: c.address ?? '',
-      type: c.type === 'WHOLESALE' ? 'جملة' : 'تقسيط',
+      type: l.customerType[c.type as 'WHOLESALE' | 'RETAIL'],
       balance: Number(c.balance),
     }));
 
     return buildExcelBuffer(
-      'الزبائن',
+      l.customers.sheetTitle,
       [
-        { header: 'الاسم', key: 'name', width: 22 },
-        { header: 'الهاتف', key: 'phone', width: 16 },
-        { header: 'العنوان', key: 'address', width: 25 },
-        { header: 'النوع', key: 'type', width: 12 },
-        { header: 'الرصيد', key: 'balance', width: 14 },
+        { header: l.customers.name, key: 'name', width: 22 },
+        { header: l.customers.phone, key: 'phone', width: 16 },
+        { header: l.customers.address, key: 'address', width: 25 },
+        { header: l.customers.type, key: 'type', width: 12 },
+        { header: l.customers.balance, key: 'balance', width: 14 },
       ],
       rows,
+      locale,
     );
   }
 
-  async exportSuppliersExcel(): Promise<Buffer> {
+  async exportSuppliersExcel(locale: InvoiceLocale = 'ar'): Promise<Buffer> {
+    const l = REPORT_LABELS[locale];
     const suppliers = await this.prisma.supplier.findMany({ orderBy: { name: 'asc' } });
     const rows = suppliers.map((s) => ({
       name: s.name,
@@ -187,14 +196,15 @@ export class ReportsService {
     }));
 
     return buildExcelBuffer(
-      'الموردون',
+      l.suppliers.sheetTitle,
       [
-        { header: 'الاسم', key: 'name', width: 22 },
-        { header: 'الهاتف', key: 'phone', width: 16 },
-        { header: 'العنوان', key: 'address', width: 25 },
-        { header: 'الرصيد', key: 'balance', width: 14 },
+        { header: l.suppliers.name, key: 'name', width: 22 },
+        { header: l.suppliers.phone, key: 'phone', width: 16 },
+        { header: l.suppliers.address, key: 'address', width: 25 },
+        { header: l.suppliers.balance, key: 'balance', width: 14 },
       ],
       rows,
+      locale,
     );
   }
 }

@@ -27,7 +27,7 @@ export class SuppliersService {
         payments: { orderBy: { createdAt: 'desc' } },
       },
     });
-    if (!supplier) throw new NotFoundException('المورد غير موجود');
+    if (!supplier) throw new NotFoundException({ code: 'SUPPLIER_NOT_FOUND' });
     return supplier;
   }
 
@@ -54,6 +54,6 @@ export class SuppliersService {
 
   private async ensureExists(id: string) {
     const found = await this.prisma.supplier.findUnique({ where: { id } });
-    if (!found) throw new NotFoundException('المورد غير موجود');
+    if (!found) throw new NotFoundException({ code: 'SUPPLIER_NOT_FOUND' });
   }
 }

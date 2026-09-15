@@ -14,10 +14,10 @@ export class AuthService {
 
   async login(email: string, password: string) {
     const user = await this.prisma.user.findUnique({ where: { email } });
-    if (!user || !user.isActive) throw new UnauthorizedException('بيانات الدخول غير صحيحة');
+    if (!user || !user.isActive) throw new UnauthorizedException({ code: 'AUTH_INVALID_CREDENTIALS' });
 
     const valid = await bcrypt.compare(password, user.passwordHash);
-    if (!valid) throw new UnauthorizedException('بيانات الدخول غير صحيحة');
+    if (!valid) throw new UnauthorizedException({ code: 'AUTH_INVALID_CREDENTIALS' });
 
     await this.audit.log(user.id, 'LOGIN', 'User', user.id);
 
@@ -38,11 +38,11 @@ export class AuthService {
   async authorizeOverride(email: string, password: string) {
     const admin = await this.prisma.user.findUnique({ where: { email } });
     if (!admin || !admin.isActive || admin.role !== 'ADMIN') {
-      throw new UnauthorizedException('صلاحيات المدير مطلوبة');
+      throw new UnauthorizedException({ code: 'AUTH_ADMIN_REQUIRED' });
     }
 
     const valid = await bcrypt.compare(password, admin.passwordHash);
-    if (!valid) throw new UnauthorizedException('بيانات الدخول غير صحيحة');
+    if (!valid) throw new UnauthorizedException({ code: 'AUTH_INVALID_CREDENTIALS' });
 
     const overrideToken = this.jwt.sign(
       { sub: admin.id, email: admin.email, role: admin.role, type: 'override' },
@@ -53,10 +53,10 @@ export class AuthService {
 
   async changePassword(userId: string, currentPassword: string, newPassword: string) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user) throw new UnauthorizedException('المستخدم غير موجود');
+    if (!user) throw new UnauthorizedException({ code: 'AUTH_USER_NOT_FOUND' });
 
     const valid = await bcrypt.compare(currentPassword, user.passwordHash);
-    if (!valid) throw new UnauthorizedException('كلمة المرور الحالية غير صحيحة');
+    if (!valid) throw new UnauthorizedException({ code: 'AUTH_CURRENT_PASSWORD_INVALID' });
 
     const passwordHash = await bcrypt.hash(newPassword, 10);
     await this.prisma.user.update({
@@ -70,14 +70,14 @@ export class AuthService {
 
   async changeEmail(userId: string, currentPassword: string, newEmail: string) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user) throw new UnauthorizedException('المستخدم غير موجود');
+    if (!user) throw new UnauthorizedException({ code: 'AUTH_USER_NOT_FOUND' });
 
     const valid = await bcrypt.compare(currentPassword, user.passwordHash);
-    if (!valid) throw new UnauthorizedException('كلمة المرور الحالية غير صحيحة');
+    if (!valid) throw new UnauthorizedException({ code: 'AUTH_CURRENT_PASSWORD_INVALID' });
 
     if (newEmail !== user.email) {
       const existing = await this.prisma.user.findUnique({ where: { email: newEmail } });
-      if (existing) throw new ConflictException('هذا البريد الإلكتروني مستخدم بالفعل');
+      if (existing) throw new ConflictException({ code: 'AUTH_EMAIL_TAKEN' });
     }
 
     const updated = await this.prisma.user.update({ where: { id: userId }, data: { email: newEmail } });

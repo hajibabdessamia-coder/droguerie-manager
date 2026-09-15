@@ -28,14 +28,14 @@ export class SalesService {
     let subtotal = 0;
     const itemsData = dto.items.map((item) => {
       const product = productMap.get(item.productId);
-      if (!product) throw new NotFoundException(`منتج غير موجود: ${item.productId}`);
+      if (!product) throw new NotFoundException({ code: 'PRODUCT_NOT_FOUND_WITH_ID', params: { productId: item.productId } });
       if (product.quantity < item.quantity) {
-        throw new BadRequestException(`الكمية غير متوفرة للمنتج: ${product.name}`);
+        throw new BadRequestException({ code: 'PRODUCT_OUT_OF_STOCK', params: { productName: product.name } });
       }
 
       let unitPrice: number;
       if (item.priceType === 'CUSTOM') {
-        if (item.customPrice === undefined) throw new BadRequestException('السعر المخصص مطلوب');
+        if (item.customPrice === undefined) throw new BadRequestException({ code: 'SALE_CUSTOM_PRICE_REQUIRED' });
         unitPrice = item.customPrice;
       } else if (item.priceType === 'WHOLESALE') {
         unitPrice = Number(product.wholesalePrice);
@@ -119,7 +119,7 @@ export class SalesService {
         seller: { select: { id: true, name: true } },
       },
     });
-    if (!sale) throw new NotFoundException('الفاتورة غير موجودة');
+    if (!sale) throw new NotFoundException({ code: 'SALE_NOT_FOUND' });
     return sale;
   }
 
@@ -134,7 +134,7 @@ export class SalesService {
     const invoiceType = dto.invoiceType ?? sale.invoiceType;
 
     if (paymentMethod === 'CREDIT' && !sale.customerId) {
-      throw new BadRequestException('لا يمكن جعل الفاتورة على الحساب بدون زبون مرتبط بها');
+      throw new BadRequestException({ code: 'SALE_CREDIT_REQUIRES_CUSTOMER' });
     }
 
     const subtotal = Number(sale.subtotal);
@@ -225,13 +225,13 @@ export class SalesService {
   }
 
   private verifyOverrideToken(token?: string): string {
-    if (!token) throw new UnauthorizedException('يتطلب تعديل السعر تفويضاً من المدير');
+    if (!token) throw new UnauthorizedException({ code: 'SALE_OVERRIDE_TOKEN_REQUIRED' });
     try {
       const payload = this.jwt.verify(token) as { sub: string; role: string; type: string };
       if (payload.type !== 'override' || payload.role !== 'ADMIN') throw new Error();
       return payload.sub;
     } catch {
-      throw new UnauthorizedException('تفويض المدير غير صالح أو منتهي الصلاحية');
+      throw new UnauthorizedException({ code: 'SALE_OVERRIDE_TOKEN_INVALID' });
     }
   }
 

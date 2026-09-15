@@ -1,9 +1,10 @@
 import { exec } from 'child_process';
 import * as fs from 'fs';
-import { Controller, Get, Query, Res, StreamableFile } from '@nestjs/common';
+import { Controller, Get, Query, Req, Res, StreamableFile } from '@nestjs/common';
 import { Role } from '../common/enums';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { resolveLocale } from '../common/i18n/locale.util';
 import { ReportQueryDto } from './dto/report-query.dto';
 import { REPORTS_ROOT } from './reports-scheduler.service';
 import { ReportsService } from './reports.service';
@@ -13,8 +14,8 @@ export class ReportsController {
   constructor(private service: ReportsService) {}
 
   @Get('summary')
-  getSummary(@Query() query: ReportQueryDto) {
-    return this.service.getSummary(query.period, query.date);
+  getSummary(@Query() query: ReportQueryDto, @Req() req: Request) {
+    return this.service.getSummary(query.period, query.date, resolveLocale(req));
   }
 
   // يفتح مجلد التقارير في مستكشف الملفات — لا معنى لهذا على خادم سحابي بدون واجهة رسومية (Render/Linux)
@@ -28,8 +29,8 @@ export class ReportsController {
   }
 
   @Get('export/summary.pdf')
-  async exportSummaryPdf(@Query() query: ReportQueryDto, @Res({ passthrough: true }) res: Response) {
-    const buffer = await this.service.exportSummaryPdf(query.period, query.date);
+  async exportSummaryPdf(@Query() query: ReportQueryDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const buffer = await this.service.exportSummaryPdf(query.period, query.date, resolveLocale(req));
     res.set({
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename="report-${query.period}.pdf"`,
@@ -41,9 +42,14 @@ export class ReportsController {
   async exportSales(
     @Query('from') from: string | undefined,
     @Query('to') to: string | undefined,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const buffer = await this.service.exportSalesExcel(from ? new Date(from) : undefined, to ? new Date(to) : undefined);
+    const buffer = await this.service.exportSalesExcel(
+      from ? new Date(from) : undefined,
+      to ? new Date(to) : undefined,
+      resolveLocale(req),
+    );
     res.set({
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'Content-Disposition': 'attachment; filename="sales.xlsx"',
@@ -52,8 +58,8 @@ export class ReportsController {
   }
 
   @Get('export/products.xlsx')
-  async exportProducts(@Res({ passthrough: true }) res: Response) {
-    const buffer = await this.service.exportProductsExcel();
+  async exportProducts(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const buffer = await this.service.exportProductsExcel(resolveLocale(req));
     res.set({
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'Content-Disposition': 'attachment; filename="products.xlsx"',
@@ -62,8 +68,8 @@ export class ReportsController {
   }
 
   @Get('export/customers.xlsx')
-  async exportCustomers(@Res({ passthrough: true }) res: Response) {
-    const buffer = await this.service.exportCustomersExcel();
+  async exportCustomers(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const buffer = await this.service.exportCustomersExcel(resolveLocale(req));
     res.set({
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'Content-Disposition': 'attachment; filename="customers.xlsx"',
@@ -72,8 +78,8 @@ export class ReportsController {
   }
 
   @Get('export/suppliers.xlsx')
-  async exportSuppliers(@Res({ passthrough: true }) res: Response) {
-    const buffer = await this.service.exportSuppliersExcel();
+  async exportSuppliers(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const buffer = await this.service.exportSuppliersExcel(resolveLocale(req));
     res.set({
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'Content-Disposition': 'attachment; filename="suppliers.xlsx"',

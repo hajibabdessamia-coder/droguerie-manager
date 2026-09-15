@@ -61,9 +61,9 @@ export default function LoginPage() {
       router.replace('/dashboard');
     } catch (err) {
       if (isAxiosError(err) && err.response) {
-        // err.response.data?.message يأتي من الخادم الخلفي (auth.service.ts) بالعربية
-        // دائماً حالياً — يُترك كما هو عمداً، ترجمة رسائل الخادم مؤجّلة لمرحلة لاحقة.
-        // القيمة الاحتياطية (?? ...) فقط من تأليف الواجهة الأمامية، لذا تُترجَم
+        // err.response.data?.message يأتي الآن مُترجَماً من الخادم الخلفي بنفس لغة
+        // الواجهة (راجع backend/src/common/i18n) — القيمة الاحتياطية (?? ...) فقط
+        // لحالة عدم وجود رسالة من الخادم إطلاقاً (مثال: انقطاع الاتصال قبل الاستجابة)
         setError(err.response.data?.message ?? t('login.invalidCredentials'));
       } else {
         setError(t('login.connectionError'));

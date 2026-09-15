@@ -61,7 +61,7 @@ export class PurchasesService {
       where: { id },
       include: { supplier: true, items: { include: { product: true } } },
     });
-    if (!purchase) throw new NotFoundException('فاتورة الشراء غير موجودة');
+    if (!purchase) throw new NotFoundException({ code: 'PURCHASE_NOT_FOUND' });
     return purchase;
   }
 }

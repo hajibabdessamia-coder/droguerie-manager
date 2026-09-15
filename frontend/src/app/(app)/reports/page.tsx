@@ -142,7 +142,7 @@ export default function ReportsPage() {
             {report && report.topProducts.length > 0 && (
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-border text-right text-muted-foreground">
+                  <tr className="border-b border-border text-start text-muted-foreground">
                     <th className="py-2 font-medium">{t('common.product')}</th>
                     <th className="py-2 font-medium">{t('common.quantity')}</th>
                     <th className="py-2 font-medium">{t('reports.revenueColumn')}</th>
@@ -174,7 +174,7 @@ export default function ReportsPage() {
             {report && report.leastProducts.length > 0 && (
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-border text-right text-muted-foreground">
+                  <tr className="border-b border-border text-start text-muted-foreground">
                     <th className="py-2 font-medium">{t('common.product')}</th>
                     <th className="py-2 font-medium">{t('common.quantity')}</th>
                     <th className="py-2 font-medium">{t('reports.revenueColumn')}</th>

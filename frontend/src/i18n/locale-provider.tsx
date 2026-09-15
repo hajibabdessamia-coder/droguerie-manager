@@ -14,8 +14,9 @@ import {
 
 const DICTIONARIES: Record<Locale, Dictionary> = { ar, fr };
 // مُجمَّد عمداً على الاسم القديم: تغييره يُفقد كل مستخدم حالي لغته المختارة
-// ويُعيده للعربية الافتراضية بلا فائدة — المفتاح داخلي ولا يظهر في الواجهة
-const STORAGE_KEY = 'pharma-manager-locale';
+// ويُعيده للعربية الافتراضية بلا فائدة — المفتاح داخلي ولا يظهر في الواجهة.
+// مُصدَّر لأن lib/api-client.ts يقرأ نفس المفتاح لإرفاق ترويسة X-Locale بكل طلب
+export const STORAGE_KEY = 'pharma-manager-locale';
 
 function isLocale(value: string | null): value is Locale {
   return value === 'ar' || value === 'fr';

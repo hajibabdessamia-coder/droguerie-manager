@@ -38,7 +38,7 @@ export default function PurchasesPage() {
         <CardContent className="overflow-x-auto p-0">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border bg-muted/30 text-right text-muted-foreground">
+              <tr className="border-b border-border bg-muted/30 text-start text-muted-foreground">
                 <th className="px-4 py-3 font-medium">{t('purchases.supplierLabel')}</th>
                 <th className="px-4 py-3 font-medium">{t('purchases.invoiceRefColumn')}</th>
                 <th className="px-4 py-3 font-medium">{t('common.grandTotal')}</th>

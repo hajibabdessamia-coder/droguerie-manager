@@ -26,6 +26,6 @@ export class ManufacturersService {
 
   private async ensureExists(id: string) {
     const found = await this.prisma.manufacturer.findUnique({ where: { id } });
-    if (!found) throw new NotFoundException('الشركة المصنعة غير موجودة');
+    if (!found) throw new NotFoundException({ code: 'MANUFACTURER_NOT_FOUND' });
   }
 }

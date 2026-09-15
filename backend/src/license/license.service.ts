@@ -31,7 +31,7 @@ export class LicenseService {
       return getDeviceId();
     } catch (err) {
       this.logger.error('تعذّر تحديد هوية الجهاز', err instanceof Error ? err.stack : err);
-      throw new InternalServerErrorException('تعذّر تحديد هوية هذا الجهاز');
+      throw new InternalServerErrorException({ code: 'LICENSE_DEVICE_ID_FAILED' });
     }
   }
 

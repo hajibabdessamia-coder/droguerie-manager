@@ -74,6 +74,7 @@ export const fr: Dictionary = {
   },
   topbar: {
     logout: 'Déconnexion',
+    switchLanguageAriaLabel: 'Changer de langue',
     trialRemainingPrefix: "Essai gratuit :",
     trialRemainingSuffix: 'jour(s) restant(s)',
   },

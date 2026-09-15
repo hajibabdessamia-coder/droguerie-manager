@@ -27,7 +27,7 @@ export class CustomersService {
         payments: { orderBy: { createdAt: 'desc' } },
       },
     });
-    if (!customer) throw new NotFoundException('الزبون غير موجود');
+    if (!customer) throw new NotFoundException({ code: 'CUSTOMER_NOT_FOUND' });
     return customer;
   }
 
@@ -54,6 +54,6 @@ export class CustomersService {
 
   private async ensureExists(id: string) {
     const found = await this.prisma.customer.findUnique({ where: { id } });
-    if (!found) throw new NotFoundException('الزبون غير موجود');
+    if (!found) throw new NotFoundException({ code: 'CUSTOMER_NOT_FOUND' });
   }
 }

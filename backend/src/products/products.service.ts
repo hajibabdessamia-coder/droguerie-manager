@@ -41,7 +41,7 @@ export class ProductsService {
       where: { id },
       include: { manufacturer: true, category: true, unit: true },
     });
-    if (!product) throw new NotFoundException('المنتج غير موجود');
+    if (!product) throw new NotFoundException({ code: 'PRODUCT_NOT_FOUND' });
     return product;
   }
 

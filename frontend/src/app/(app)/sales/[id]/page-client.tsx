@@ -201,7 +201,7 @@ export default function SaleDetailPage() {
         <CardContent className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border text-right text-muted-foreground">
+              <tr className="border-b border-border text-start text-muted-foreground">
                 <th className="py-2 font-medium">{t('common.product')}</th>
                 <th className="py-2 font-medium">{t('common.quantity')}</th>
                 <th className="py-2 font-medium">{t('sales.unitPriceColumn')}</th>

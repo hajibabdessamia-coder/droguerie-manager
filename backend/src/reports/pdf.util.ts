@@ -9,7 +9,7 @@ export async function renderPdfFromHtml(html: string): Promise<Buffer> {
     browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'], pipe: true });
   } catch (err) {
     logger.error('Puppeteer failed to launch (PDF generation)', err instanceof Error ? err.stack : err);
-    throw new InternalServerErrorException('فشل توليد ملف PDF');
+    throw new InternalServerErrorException({ code: 'PDF_GENERATION_FAILED' });
   }
 
   try {
@@ -23,24 +23,26 @@ export async function renderPdfFromHtml(html: string): Promise<Buffer> {
     return Buffer.from(pdf);
   } catch (err) {
     logger.error('PDF generation failed', err instanceof Error ? err.stack : err);
-    throw new InternalServerErrorException('فشل توليد ملف PDF');
+    throw new InternalServerErrorException({ code: 'PDF_GENERATION_FAILED' });
   } finally {
     await browser.close();
   }
 }
 
-function formatCurrency(value: number): string {
-  return `${value.toLocaleString('ar-MA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} د.م.`;
+// نفس منطق تنسيق العملة في frontend/src/lib/utils.ts (CURRENCY_SUFFIX) — رمز الدرهم
+// بالحروف العربية في الوضع العربي، واختصار MAD في الوضع الفرنسي
+function formatCurrency(value: number, locale: InvoiceLocale = 'ar'): string {
+  const formatted = value.toLocaleString(locale === 'ar' ? 'ar-MA' : 'fr-FR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  return locale === 'ar' ? `${formatted} د.م.` : `${formatted} MAD`;
 }
 
-function formatDate(value: Date): string {
-  return value.toLocaleDateString('ar-MA');
+function formatDate(value: Date, locale: InvoiceLocale = 'ar'): string {
+  return value.toLocaleDateString(locale === 'ar' ? 'ar-MA' : 'fr-FR');
 }
 
-// دعم لغتين لقالب الفاتورة المطبوعة فقط (أكثر مستند يصل للزبون مباشرة) — راجع
-// InvoiceLocale أدناه. بقية هذا الملف (buildSummaryReportHtml وتقارير Excel) لا يزال
-// عربياً فقط: ترجمتها تتطلب آلية i18n عامة على مستوى الواجهة الخلفية بأكملها
-// (رسائل الأخطاء، DTOs...)، وهذا نطاق أوسع من إصلاح قالب فاتورة واحد
 export type InvoiceLocale = 'ar' | 'fr';
 
 const INVOICE_LABELS: Record<InvoiceLocale, {
@@ -110,12 +112,65 @@ export interface SummaryReportData {
   leastProducts: ProductStat[];
 }
 
-export function buildSummaryReportHtml(report: SummaryReportData): string {
+export const SUMMARY_LABELS: Record<InvoiceLocale, {
+  reportTitlePrefix: string;
+  fromLabel: string;
+  toLabel: string;
+  totalSales: string;
+  profit: string;
+  invoiceCount: string;
+  purchasesValue: string;
+  inventoryValue: string;
+  topProducts: string;
+  leastProducts: string;
+  productCol: string;
+  qtySoldCol: string;
+  revenueCol: string;
+  noData: string;
+}> = {
+  ar: {
+    reportTitlePrefix: 'تقرير',
+    fromLabel: 'من',
+    toLabel: 'إلى',
+    totalSales: 'إجمالي المبيعات',
+    profit: 'الأرباح',
+    invoiceCount: 'عدد الفواتير',
+    purchasesValue: 'قيمة المشتريات',
+    inventoryValue: 'قيمة المخزون',
+    topProducts: 'أفضل المنتجات مبيعاً',
+    leastProducts: 'أقل المنتجات مبيعاً',
+    productCol: 'المنتج',
+    qtySoldCol: 'الكمية المباعة',
+    revenueCol: 'الإيراد',
+    noData: 'لا توجد بيانات',
+  },
+  fr: {
+    reportTitlePrefix: 'Rapport',
+    fromLabel: 'Du',
+    toLabel: 'au',
+    totalSales: 'Total des ventes',
+    profit: 'Bénéfices',
+    invoiceCount: 'Nombre de factures',
+    purchasesValue: 'Valeur des achats',
+    inventoryValue: 'Valeur du stock',
+    topProducts: 'Meilleurs produits vendus',
+    leastProducts: 'Produits les moins vendus',
+    productCol: 'Produit',
+    qtySoldCol: 'Quantité vendue',
+    revenueCol: 'Revenu',
+    noData: 'Aucune donnée',
+  },
+};
+
+export function buildSummaryReportHtml(report: SummaryReportData, locale: InvoiceLocale = 'ar'): string {
+  const dir = locale === 'ar' ? 'rtl' : 'ltr';
+  const l = SUMMARY_LABELS[locale];
   const productRow = (p: ProductStat) =>
-    `<tr><td>${p.name}</td><td>${p.qty}</td><td>${formatCurrency(p.revenue)}</td></tr>`;
+    `<tr><td>${p.name}</td><td>${p.qty}</td><td>${formatCurrency(p.revenue, locale)}</td></tr>`;
+  const emptyRow = `<tr><td colspan="3">${l.noData}</td></tr>`;
 
   return `<!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="${locale}" dir="${dir}">
 <head>
 <meta charset="utf-8" />
 <style>
@@ -127,33 +182,33 @@ export function buildSummaryReportHtml(report: SummaryReportData): string {
   .card .label { font-size: 11px; color: #666; }
   .card .value { font-size: 18px; font-weight: bold; margin-top: 4px; }
   table { width: 100%; border-collapse: collapse; margin-bottom: 24px; font-size: 13px; }
-  th, td { border-bottom: 1px solid #ddd; padding: 6px 8px; text-align: right; }
+  th, td { border-bottom: 1px solid #ddd; padding: 6px 8px; text-align: start; }
   th { background: #f5f5f5; }
   h2 { font-size: 15px; margin: 16px 0 8px; }
 </style>
 </head>
 <body>
-  <h1>تقرير ${report.periodLabel}</h1>
-  <p class="muted">من ${formatDate(report.start)} إلى ${formatDate(report.end)}</p>
+  <h1>${l.reportTitlePrefix} ${report.periodLabel}</h1>
+  <p class="muted">${l.fromLabel} ${formatDate(report.start, locale)} ${l.toLabel} ${formatDate(report.end, locale)}</p>
 
   <div class="grid">
-    <div class="card"><div class="label">إجمالي المبيعات</div><div class="value">${formatCurrency(report.salesTotal)}</div></div>
-    <div class="card"><div class="label">الأرباح</div><div class="value">${formatCurrency(report.profitTotal)}</div></div>
-    <div class="card"><div class="label">عدد الفواتير</div><div class="value">${report.invoiceCount}</div></div>
-    <div class="card"><div class="label">قيمة المشتريات</div><div class="value">${formatCurrency(report.purchasesValue)}</div></div>
-    <div class="card"><div class="label">قيمة المخزون</div><div class="value">${formatCurrency(report.inventoryValue)}</div></div>
+    <div class="card"><div class="label">${l.totalSales}</div><div class="value">${formatCurrency(report.salesTotal, locale)}</div></div>
+    <div class="card"><div class="label">${l.profit}</div><div class="value">${formatCurrency(report.profitTotal, locale)}</div></div>
+    <div class="card"><div class="label">${l.invoiceCount}</div><div class="value">${report.invoiceCount}</div></div>
+    <div class="card"><div class="label">${l.purchasesValue}</div><div class="value">${formatCurrency(report.purchasesValue, locale)}</div></div>
+    <div class="card"><div class="label">${l.inventoryValue}</div><div class="value">${formatCurrency(report.inventoryValue, locale)}</div></div>
   </div>
 
-  <h2>أفضل المنتجات مبيعاً</h2>
+  <h2>${l.topProducts}</h2>
   <table>
-    <thead><tr><th>المنتج</th><th>الكمية المباعة</th><th>الإيراد</th></tr></thead>
-    <tbody>${report.topProducts.map(productRow).join('') || '<tr><td colspan="3">لا توجد بيانات</td></tr>'}</tbody>
+    <thead><tr><th>${l.productCol}</th><th>${l.qtySoldCol}</th><th>${l.revenueCol}</th></tr></thead>
+    <tbody>${report.topProducts.map(productRow).join('') || emptyRow}</tbody>
   </table>
 
-  <h2>أقل المنتجات مبيعاً</h2>
+  <h2>${l.leastProducts}</h2>
   <table>
-    <thead><tr><th>المنتج</th><th>الكمية المباعة</th><th>الإيراد</th></tr></thead>
-    <tbody>${report.leastProducts.map(productRow).join('') || '<tr><td colspan="3">لا توجد بيانات</td></tr>'}</tbody>
+    <thead><tr><th>${l.productCol}</th><th>${l.qtySoldCol}</th><th>${l.revenueCol}</th></tr></thead>
+    <tbody>${report.leastProducts.map(productRow).join('') || emptyRow}</tbody>
   </table>
 </body>
 </html>`;
@@ -189,7 +244,7 @@ export function buildInvoiceHtml(data: InvoicePdfData): string {
   const l = INVOICE_LABELS[locale];
 
   const itemRow = (item: InvoicePdfData['items'][number]) =>
-    `<tr><td>${item.name}</td><td>${item.quantity}</td><td>${formatCurrency(item.unitPrice)}</td><td>${formatCurrency(item.total)}</td></tr>`;
+    `<tr><td>${item.name}</td><td>${item.quantity}</td><td>${formatCurrency(item.unitPrice, locale)}</td><td>${formatCurrency(item.total, locale)}</td></tr>`;
 
   // سطر أرقام تعريف المحل (IF/ICE/RC/Patente) — كانت البيانات تُستقبَل هنا (راجع
   // InvoicePdfData.store) لكن لم تكن تُطبَع إطلاقاً، خلافاً لنسخة الشاشة المطابقة
@@ -227,7 +282,7 @@ export function buildInvoiceHtml(data: InvoicePdfData): string {
     </div>
     <div style="text-align:end">
       <p style="font-size:16px;font-weight:bold">${l.invoiceNumberPrefix} ${data.invoiceNumber}</p>
-      <p class="muted">${formatDate(data.createdAt)}</p>
+      <p class="muted">${formatDate(data.createdAt, locale)}</p>
       <p class="muted">${data.customerName}</p>
       ${taxIdLines}
     </div>
@@ -239,12 +294,12 @@ export function buildInvoiceHtml(data: InvoicePdfData): string {
   </table>
 
   <div class="totals">
-    <div><span>${l.subtotal}</span><span>${formatCurrency(data.subtotal)}</span></div>
-    <div><span>${l.discount}</span><span>${formatCurrency(data.discount)}</span></div>
-    <div><span>${l.tax} (${data.taxRate}%)</span><span>${formatCurrency(data.taxAmount)}</span></div>
-    <div class="grand"><span>${l.grandTotal}</span><span>${formatCurrency(data.total)}</span></div>
-    <div><span>${l.paid}</span><span>${formatCurrency(data.amountPaid)}</span></div>
-    <div><span>${l.changeDue}</span><span>${formatCurrency(data.changeDue)}</span></div>
+    <div><span>${l.subtotal}</span><span>${formatCurrency(data.subtotal, locale)}</span></div>
+    <div><span>${l.discount}</span><span>${formatCurrency(data.discount, locale)}</span></div>
+    <div><span>${l.tax} (${data.taxRate}%)</span><span>${formatCurrency(data.taxAmount, locale)}</span></div>
+    <div class="grand"><span>${l.grandTotal}</span><span>${formatCurrency(data.total, locale)}</span></div>
+    <div><span>${l.paid}</span><span>${formatCurrency(data.amountPaid, locale)}</span></div>
+    <div><span>${l.changeDue}</span><span>${formatCurrency(data.changeDue, locale)}</span></div>
   </div>
 </body>
 </html>`;

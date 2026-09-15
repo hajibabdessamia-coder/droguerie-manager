@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { LocaleToggle } from '@/components/locale-toggle';
 import { fetchStoreSettings } from '@/lib/store-settings';
 import { fetchLicenseStatus } from '@/lib/license';
 import { useAuthStore } from '@/store/auth-store';
@@ -47,6 +48,7 @@ export function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
             {t('topbar.trialRemainingPrefix')} {licenseStatus.remainingDays} {t('topbar.trialRemainingSuffix')}
           </Badge>
         )}
+        <LocaleToggle />
         <ThemeToggle />
         {user && (
           <div className="flex items-center gap-2 rounded-lg border border-border py-1.5 ps-1.5 pe-3 text-sm">

@@ -20,7 +20,7 @@ export class UploadsController {
       limits: { fileSize: MAX_SIZE },
       fileFilter: (_req, file, callback) => {
         if (!ALLOWED_TYPES.includes(file.mimetype)) {
-          callback(new BadRequestException('صيغة الصورة غير مدعومة (jpg, png, webp فقط)'), false);
+          callback(new BadRequestException({ code: 'UPLOAD_INVALID_IMAGE_FORMAT' }), false);
           return;
         }
         callback(null, true);
@@ -28,7 +28,7 @@ export class UploadsController {
     }),
   )
   async uploadProductImage(@UploadedFile() file: Express.Multer.File) {
-    if (!file) throw new BadRequestException('الملف مطلوب');
+    if (!file) throw new BadRequestException({ code: 'UPLOAD_FILE_REQUIRED' });
     const url = await this.storage.uploadImage(file, 'products');
     return { url };
   }

@@ -1,8 +1,9 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Res, StreamableFile } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, Res, StreamableFile } from '@nestjs/common';
 import { Role } from '../common/enums';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { resolveLocale } from '../common/i18n/locale.util';
 import { CreateSaleDto } from './dto/create-sale.dto';
 import { UpdateSaleDto } from './dto/update-sale.dto';
 import { SalesService } from './sales.service';
@@ -27,12 +28,8 @@ export class SalesController {
   }
 
   @Get(':id/pdf')
-  async downloadPdf(
-    @Param('id') id: string,
-    @Query('locale') locale: string | undefined,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    const buffer = await this.service.generateInvoicePdf(id, locale === 'fr' ? 'fr' : 'ar');
+  async downloadPdf(@Param('id') id: string, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const buffer = await this.service.generateInvoicePdf(id, resolveLocale(req));
     res.set({
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename="invoice-${id}.pdf"`,

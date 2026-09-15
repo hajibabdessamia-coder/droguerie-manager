@@ -82,6 +82,7 @@ export const ar = {
   },
   topbar: {
     logout: 'تسجيل الخروج',
+    switchLanguageAriaLabel: 'تغيير اللغة',
     trialRemainingPrefix: 'الفترة التجريبية:',
     trialRemainingSuffix: 'يوم متبقٍ',
   },

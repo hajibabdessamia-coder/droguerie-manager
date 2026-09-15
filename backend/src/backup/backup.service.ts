@@ -47,7 +47,7 @@ export class BackupService {
 
   async remove(id: string) {
     const backup = await this.prisma.backup.findUnique({ where: { id } });
-    if (!backup) throw new NotFoundException('النسخة الاحتياطية غير موجودة');
+    if (!backup) throw new NotFoundException({ code: 'BACKUP_NOT_FOUND' });
     if (fs.existsSync(backup.filePath)) fs.unlinkSync(backup.filePath);
     await this.prisma.backup.delete({ where: { id } });
     return { ok: true };
@@ -55,9 +55,9 @@ export class BackupService {
 
   async restore(id: string) {
     const backup = await this.prisma.backup.findUnique({ where: { id } });
-    if (!backup) throw new NotFoundException('النسخة الاحتياطية غير موجودة');
+    if (!backup) throw new NotFoundException({ code: 'BACKUP_NOT_FOUND' });
     if (!fs.existsSync(backup.filePath)) {
-      throw new NotFoundException('ملف النسخة الاحتياطية مفقود من القرص');
+      throw new NotFoundException({ code: 'BACKUP_FILE_MISSING' });
     }
 
     fs.copyFileSync(backup.filePath, RESTORE_MARKER);

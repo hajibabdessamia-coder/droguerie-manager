@@ -6,6 +6,7 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { PrismaExceptionFilter } from './common/filters/prisma-exception.filter';
+import { I18nHttpExceptionFilter } from './common/filters/http-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -20,7 +21,9 @@ async function bootstrap() {
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true }),
   );
-  app.useGlobalFilters(new PrismaExceptionFilter());
+  // الترتيب غير مهم هنا: كل مرشِّحة تلتقط نوع استثناء مختلف تماماً (Prisma مقابل
+  // HttpException) فلا تتداخلان أبداً على نفس الاستثناء
+  app.useGlobalFilters(new PrismaExceptionFilter(), new I18nHttpExceptionFilter());
 
   const config = new DocumentBuilder()
     .setTitle('L7ssab Manager API')

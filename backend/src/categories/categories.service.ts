@@ -28,6 +28,6 @@ export class CategoriesService {
 
   private async ensureExists(id: string) {
     const found = await this.prisma.category.findUnique({ where: { id } });
-    if (!found) throw new NotFoundException('الفئة غير موجودة');
+    if (!found) throw new NotFoundException({ code: 'CATEGORY_NOT_FOUND' });
   }
 }

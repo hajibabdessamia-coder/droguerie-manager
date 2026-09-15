@@ -48,7 +48,7 @@ export default function ReceiptPage() {
               {settings?.address && <p className="text-sm text-gray-600">{settings.address}</p>}
               {settings?.phone && <p className="text-sm text-gray-600">{settings.phone}</p>}
             </div>
-            <div className="text-left text-sm">
+            <div className="text-end text-sm">
               <p className="text-lg font-bold">
                 {t('pos.receiptInvoiceNumberPrefix')}
                 {sale.invoiceNumber}
@@ -62,7 +62,7 @@ export default function ReceiptPage() {
               <span className="font-semibold">{t('common.customerLabel')}: </span>
               {sale.customer?.name ?? t('common.walkInCustomer')}
             </p>
-            <div className="space-y-0.5 text-left text-xs text-gray-600">
+            <div className="space-y-0.5 text-end text-xs text-gray-600">
               {settings?.ifNumber && <p>IF: {settings.ifNumber}</p>}
               {settings?.ice && <p>ICE: {settings.ice}</p>}
               {settings?.rc && <p>RC: {settings.rc}</p>}
@@ -72,7 +72,7 @@ export default function ReceiptPage() {
 
           <table className="mt-6 w-full text-sm">
             <thead>
-              <tr className="border-b-2 border-gray-800 text-right">
+              <tr className="border-b-2 border-gray-800 text-start">
                 <th className="py-2 font-semibold">{t('common.product')}</th>
                 <th className="py-2 font-semibold">{t('common.quantity')}</th>
                 <th className="py-2 font-semibold">{t('sales.unitPriceColumn')}</th>

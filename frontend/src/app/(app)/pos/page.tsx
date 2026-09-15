@@ -219,7 +219,7 @@ export default function PosPage() {
                 type="button"
                 onClick={() => addProductToCart(p)}
                 disabled={p.quantity <= 0}
-                className="flex flex-col items-start gap-2 rounded-xl border border-border bg-card p-3 text-right transition-colors hover:border-primary disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex flex-col items-start gap-2 rounded-xl border border-border bg-card p-3 text-start transition-colors hover:border-primary disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {p.imageUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -270,7 +270,7 @@ export default function PosPage() {
                 <div key={line.productId} className="flex flex-col gap-2 rounded-lg border border-border p-2">
                   <div className="flex items-center gap-2">
                     <p className="min-w-0 flex-1 truncate text-sm font-medium">{line.name}</p>
-                    <div className="w-16 shrink-0 text-left text-sm font-medium">
+                    <div className="w-16 shrink-0 text-end text-sm font-medium">
                       {formatCurrency(resolveUnitPrice(line) * line.quantity, locale)}
                     </div>
                     <Button

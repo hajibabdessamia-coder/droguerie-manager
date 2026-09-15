@@ -1,4 +1,5 @@
 import { ReportPeriod } from './dto/report-query.dto';
+import type { InvoiceLocale } from './pdf.util';
 
 export function getPeriodRange(period: ReportPeriod, dateStr?: string): { start: Date; end: Date } {
   const date = dateStr ? new Date(dateStr) : new Date();
@@ -35,9 +36,11 @@ export function getPeriodRange(period: ReportPeriod, dateStr?: string): { start:
   return { start, end };
 }
 
-export const PERIOD_LABEL: Record<ReportPeriod, string> = {
-  daily: 'يومي',
-  weekly: 'أسبوعي',
-  monthly: 'شهري',
-  yearly: 'سنوي',
+const PERIOD_LABEL: Record<InvoiceLocale, Record<ReportPeriod, string>> = {
+  ar: { daily: 'يومي', weekly: 'أسبوعي', monthly: 'شهري', yearly: 'سنوي' },
+  fr: { daily: 'Quotidien', weekly: 'Hebdomadaire', monthly: 'Mensuel', yearly: 'Annuel' },
 };
+
+export function getPeriodLabel(period: ReportPeriod, locale: InvoiceLocale = 'ar'): string {
+  return PERIOD_LABEL[locale][period];
+}
