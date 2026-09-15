@@ -27,8 +27,12 @@ export class SalesController {
   }
 
   @Get(':id/pdf')
-  async downloadPdf(@Param('id') id: string, @Res({ passthrough: true }) res: Response) {
-    const buffer = await this.service.generateInvoicePdf(id);
+  async downloadPdf(
+    @Param('id') id: string,
+    @Query('locale') locale: string | undefined,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const buffer = await this.service.generateInvoicePdf(id, locale === 'fr' ? 'fr' : 'ar');
     res.set({
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename="invoice-${id}.pdf"`,

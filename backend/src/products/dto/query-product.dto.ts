@@ -1,5 +1,4 @@
-import { IsEnum, IsOptional, IsString } from 'class-validator';
-import { ProductGroup } from '../../common/enums';
+import { IsOptional, IsString } from 'class-validator';
 
 export class QueryProductDto {
   @IsOptional()
@@ -7,8 +6,8 @@ export class QueryProductDto {
   search?: string; // اسم أو كود داخلي
 
   @IsOptional()
-  @IsEnum(ProductGroup)
-  group?: ProductGroup;
+  @IsString()
+  categoryId?: string;
 
   @IsOptional()
   @IsString()

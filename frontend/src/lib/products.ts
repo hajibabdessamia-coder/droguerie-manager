@@ -1,9 +1,9 @@
 import { apiClient } from './api-client';
-import type { Product, ProductGroup } from '@/types';
+import type { Product } from '@/types';
 
 export interface ProductQuery {
   search?: string;
-  group?: ProductGroup;
+  categoryId?: string;
   manufacturerId?: string;
   lowStock?: boolean;
 }
@@ -12,7 +12,7 @@ export async function fetchProducts(query: ProductQuery = {}): Promise<Product[]
   const { data } = await apiClient.get<Product[]>('/products', {
     params: {
       search: query.search || undefined,
-      group: query.group || undefined,
+      categoryId: query.categoryId || undefined,
       manufacturerId: query.manufacturerId || undefined,
       lowStock: query.lowStock ? 'true' : undefined,
     },
@@ -29,7 +29,8 @@ export interface ProductInput {
   name: string;
   imageUrl?: string;
   internalCode: string;
-  group?: ProductGroup;
+  categoryId?: string;
+  unitId?: string;
   manufacturerId?: string;
   purchasePrice: number;
   retailPrice: number;

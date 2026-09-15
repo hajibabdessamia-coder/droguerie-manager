@@ -52,17 +52,30 @@ async function seedDemoData(sellerId: string) {
     }),
   ]);
 
+  // فئات ووحدات تجريبية — تُظهر أن التصنيف والوحدات قابلان للتخصيص بالكامل من
+  // طرف المستخدم (راجع categories/ و units/) وليسا مبرمجين بشكل ثابت
+  const [catLighting, catBreakers, catCables, catSwitches] = await Promise.all([
+    prisma.category.upsert({ where: { name: 'إضاءة' }, update: {}, create: { name: 'إضاءة', sortOrder: 1 } }),
+    prisma.category.upsert({ where: { name: 'قواطع وحماية' }, update: {}, create: { name: 'قواطع وحماية', sortOrder: 2 } }),
+    prisma.category.upsert({ where: { name: 'أسلاك وكوابل' }, update: {}, create: { name: 'أسلاك وكوابل', sortOrder: 3 } }),
+    prisma.category.upsert({ where: { name: 'مفاتيح' }, update: {}, create: { name: 'مفاتيح', sortOrder: 4 } }),
+  ]);
+  const [unitPiece, unitRoll] = await Promise.all([
+    prisma.unit.upsert({ where: { name: 'قطعة' }, update: {}, create: { name: 'قطعة', sortOrder: 1 } }),
+    prisma.unit.upsert({ where: { name: 'لفة' }, update: {}, create: { name: 'لفة', sortOrder: 2 } }),
+  ]);
+
   const productDefs = [
-    { code: 'DEMO-001', name: 'مصباح LED 12 واط', group: 'GROUP_1', manufacturerId: manufacturer1.id, purchasePrice: 8, retailPrice: 18, wholesalePrice: 13, quantity: 40, minStock: 10 },
-    { code: 'DEMO-002', name: 'مصباح LED 20 واط', group: 'GROUP_1', manufacturerId: manufacturer1.id, purchasePrice: 12, retailPrice: 25, wholesalePrice: 19, quantity: 5, minStock: 10 },
-    { code: 'DEMO-003', name: 'مقبس كهربائي مزدوج', group: 'GROUP_1', manufacturerId: manufacturer2.id, purchasePrice: 6, retailPrice: 15, wholesalePrice: 10, quantity: 45, minStock: 10 },
-    { code: 'DEMO-004', name: 'قاطع كهربائي 20A', group: 'GROUP_2', manufacturerId: manufacturer2.id, purchasePrice: 15, retailPrice: 32, wholesalePrice: 24, quantity: 30, minStock: 5 },
-    { code: 'DEMO-005', name: 'قاطع كهربائي 32A', group: 'GROUP_2', manufacturerId: manufacturer2.id, purchasePrice: 20, retailPrice: 42, wholesalePrice: 32, quantity: 3, minStock: 5 },
-    { code: 'DEMO-006', name: 'منظم جهد كهربائي', group: 'GROUP_2', manufacturerId: manufacturer2.id, purchasePrice: 90, retailPrice: 160, wholesalePrice: 130, quantity: 6, minStock: 5 },
-    { code: 'DEMO-007', name: 'كابل كهربائي 2.5مم (لفة)', group: 'GROUP_3', manufacturerId: manufacturer2.id, purchasePrice: 35, retailPrice: 65, wholesalePrice: 52, quantity: 25, minStock: 5 },
-    { code: 'DEMO-008', name: 'كابل كهربائي 4مم (لفة)', group: 'GROUP_3', manufacturerId: manufacturer2.id, purchasePrice: 55, retailPrice: 95, wholesalePrice: 78, quantity: 8, minStock: 5 },
-    { code: 'DEMO-009', name: 'مفتاح إنارة أحادي', group: 'GROUP_4', manufacturerId: manufacturer1.id, purchasePrice: 4, retailPrice: 10, wholesalePrice: 7, quantity: 60, minStock: 15 },
-    { code: 'DEMO-010', name: 'مفتاح إنارة مزدوج', group: 'GROUP_4', manufacturerId: manufacturer1.id, purchasePrice: 6, retailPrice: 14, wholesalePrice: 10, quantity: 12, minStock: 15 },
+    { code: 'DEMO-001', name: 'مصباح LED 12 واط', categoryId: catLighting.id, unitId: unitPiece.id, manufacturerId: manufacturer1.id, purchasePrice: 8, retailPrice: 18, wholesalePrice: 13, quantity: 40, minStock: 10 },
+    { code: 'DEMO-002', name: 'مصباح LED 20 واط', categoryId: catLighting.id, unitId: unitPiece.id, manufacturerId: manufacturer1.id, purchasePrice: 12, retailPrice: 25, wholesalePrice: 19, quantity: 5, minStock: 10 },
+    { code: 'DEMO-003', name: 'مقبس كهربائي مزدوج', categoryId: catLighting.id, unitId: unitPiece.id, manufacturerId: manufacturer2.id, purchasePrice: 6, retailPrice: 15, wholesalePrice: 10, quantity: 45, minStock: 10 },
+    { code: 'DEMO-004', name: 'قاطع كهربائي 20A', categoryId: catBreakers.id, unitId: unitPiece.id, manufacturerId: manufacturer2.id, purchasePrice: 15, retailPrice: 32, wholesalePrice: 24, quantity: 30, minStock: 5 },
+    { code: 'DEMO-005', name: 'قاطع كهربائي 32A', categoryId: catBreakers.id, unitId: unitPiece.id, manufacturerId: manufacturer2.id, purchasePrice: 20, retailPrice: 42, wholesalePrice: 32, quantity: 3, minStock: 5 },
+    { code: 'DEMO-006', name: 'منظم جهد كهربائي', categoryId: catBreakers.id, unitId: unitPiece.id, manufacturerId: manufacturer2.id, purchasePrice: 90, retailPrice: 160, wholesalePrice: 130, quantity: 6, minStock: 5 },
+    { code: 'DEMO-007', name: 'كابل كهربائي 2.5مم (لفة)', categoryId: catCables.id, unitId: unitRoll.id, manufacturerId: manufacturer2.id, purchasePrice: 35, retailPrice: 65, wholesalePrice: 52, quantity: 25, minStock: 5 },
+    { code: 'DEMO-008', name: 'كابل كهربائي 4مم (لفة)', categoryId: catCables.id, unitId: unitRoll.id, manufacturerId: manufacturer2.id, purchasePrice: 55, retailPrice: 95, wholesalePrice: 78, quantity: 8, minStock: 5 },
+    { code: 'DEMO-009', name: 'مفتاح إنارة أحادي', categoryId: catSwitches.id, unitId: unitPiece.id, manufacturerId: manufacturer1.id, purchasePrice: 4, retailPrice: 10, wholesalePrice: 7, quantity: 60, minStock: 15 },
+    { code: 'DEMO-010', name: 'مفتاح إنارة مزدوج', categoryId: catSwitches.id, unitId: unitPiece.id, manufacturerId: manufacturer1.id, purchasePrice: 6, retailPrice: 14, wholesalePrice: 10, quantity: 12, minStock: 15 },
   ] as const;
 
   // المنتجان اللذان سيُستخدمان في فاتورة الشراء التجريبية يُنشآن بكمية أقل من الهدف
@@ -75,7 +88,8 @@ async function seedDemoData(sellerId: string) {
         data: {
           internalCode: p.code,
           name: p.name,
-          group: p.group,
+          categoryId: p.categoryId,
+          unitId: p.unitId,
           manufacturerId: p.manufacturerId,
           purchasePrice: p.purchasePrice,
           retailPrice: p.retailPrice,

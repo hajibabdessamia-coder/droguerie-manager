@@ -186,16 +186,17 @@ export class SalesService {
     });
   }
 
-  async generateInvoicePdf(id: string): Promise<Buffer> {
+  async generateInvoicePdf(id: string, locale: 'ar' | 'fr' = 'ar'): Promise<Buffer> {
     // استيراد ديناميكي: يتجنب تحميل Puppeteer (وأخطاء تحويل ESM في Jest) عند تحميل هذه الخدمة من أجل اختبارات لا تستدعي هذه الدالة
-    const { buildInvoiceHtml, renderPdfFromHtml } = await import('../reports/pdf.util');
+    const { buildInvoiceHtml, renderPdfFromHtml, invoiceWalkInCustomerLabel } = await import('../reports/pdf.util');
     const sale = await this.findOne(id);
     const store = await this.prisma.storeSettings.findFirst();
 
     const html = buildInvoiceHtml({
       invoiceNumber: sale.invoiceNumber,
       createdAt: sale.createdAt,
-      customerName: sale.customer?.name ?? 'زبون عابر',
+      customerName: sale.customer?.name ?? invoiceWalkInCustomerLabel(locale),
+      locale,
       items: sale.items.map((item) => ({
         name: item.product?.name ?? item.productId,
         quantity: item.quantity,

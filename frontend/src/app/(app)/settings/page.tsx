@@ -10,8 +10,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { fetchStoreSettings, updateStoreSettings } from '@/lib/store-settings';
 import { createBackup, deleteBackup, fetchBackups, openBackupsFolder, restoreBackup } from '@/lib/backup';
+import { createCategory, deleteCategory, fetchCategories, updateCategory } from '@/lib/categories';
+import { createUnit, deleteUnit, fetchUnits, updateUnit } from '@/lib/units';
 import { formatDateTime } from '@/lib/utils';
 import { useLocale } from '@/i18n/locale-provider';
+import { NamedListManager } from '@/components/settings/named-list-manager';
 
 export default function SettingsPage() {
   const { t, locale } = useLocale();
@@ -118,6 +121,42 @@ export default function SettingsPage() {
     if (!bytes) return '—';
     return `${(bytes / (1024 * 1024)).toFixed(2)} ${t('settings.megabyteSuffix')}`;
   }
+
+  const { data: categories } = useQuery({ queryKey: ['categories'], queryFn: fetchCategories });
+  const createCategoryMutation = useMutation({
+    mutationFn: (name: string) => createCategory(name),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['categories'] }),
+  });
+  const renameCategoryMutation = useMutation({
+    mutationFn: ({ id, name }: { id: string; name: string }) => updateCategory(id, name),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['categories'] }),
+  });
+  const deleteCategoryMutation = useMutation({
+    mutationFn: (id: string) => deleteCategory(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['categories'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['pos-products'] });
+    },
+  });
+
+  const { data: units } = useQuery({ queryKey: ['units'], queryFn: fetchUnits });
+  const createUnitMutation = useMutation({
+    mutationFn: (name: string) => createUnit(name),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['units'] }),
+  });
+  const renameUnitMutation = useMutation({
+    mutationFn: ({ id, name }: { id: string; name: string }) => updateUnit(id, name),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['units'] }),
+  });
+  const deleteUnitMutation = useMutation({
+    mutationFn: (id: string) => deleteUnit(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['units'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['pos-products'] });
+    },
+  });
 
   return (
     <div className="flex flex-col gap-6">
@@ -266,6 +305,50 @@ export default function SettingsPage() {
             )}
           </CardContent>
         </Card>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <div className="flex flex-col gap-4">
+          <div>
+            <h2 className="text-xl font-bold">{t('settings.categoriesSectionTitle')}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{t('settings.categoriesSubtitle')}</p>
+          </div>
+          <Card>
+            <CardContent className="p-5">
+              <NamedListManager
+                items={categories}
+                onCreate={(name) => createCategoryMutation.mutate(name)}
+                onRename={(id, name) => renameCategoryMutation.mutate({ id, name })}
+                onDelete={(id) => deleteCategoryMutation.mutate(id)}
+                addPlaceholder={t('settings.addCategoryPlaceholder')}
+                emptyLabel={t('settings.noCategoriesYet')}
+                deleteConfirm={(name) => `${t('settings.deleteCategoryConfirmPrefix')}"${name}"${t('settings.deleteCategoryConfirmSuffix')}`}
+                isMutating={createCategoryMutation.isPending}
+              />
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="flex flex-col gap-4">
+          <div>
+            <h2 className="text-xl font-bold">{t('settings.unitsSectionTitle')}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{t('settings.unitsSubtitle')}</p>
+          </div>
+          <Card>
+            <CardContent className="p-5">
+              <NamedListManager
+                items={units}
+                onCreate={(name) => createUnitMutation.mutate(name)}
+                onRename={(id, name) => renameUnitMutation.mutate({ id, name })}
+                onDelete={(id) => deleteUnitMutation.mutate(id)}
+                addPlaceholder={t('settings.addUnitPlaceholder')}
+                emptyLabel={t('settings.noUnitsYet')}
+                deleteConfirm={(name) => `${t('settings.deleteUnitConfirmPrefix')}"${name}"${t('settings.deleteUnitConfirmSuffix')}`}
+                isMutating={createUnitMutation.isPending}
+              />
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );

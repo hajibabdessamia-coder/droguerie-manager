@@ -15,12 +15,12 @@ import { useDebouncedValue } from '@/hooks/use-debounce';
 import { authorizeOverride } from '@/lib/auth';
 import { fetchCustomers } from '@/lib/customers';
 import { fetchProducts } from '@/lib/products';
-import { PRODUCT_GROUPS } from '@/lib/product-groups';
+import { fetchCategories } from '@/lib/categories';
 import { createSale } from '@/lib/sales';
 import { fetchStoreSettings } from '@/lib/store-settings';
 import { cn, formatCurrency } from '@/lib/utils';
 import { useLocale } from '@/i18n/locale-provider';
-import type { InvoiceType, PaymentMethod, PriceType, Product, ProductGroup } from '@/types';
+import type { InvoiceType, PaymentMethod, PriceType, Product } from '@/types';
 
 interface CartLine {
   productId: string;
@@ -47,7 +47,10 @@ export default function PosPage() {
 
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search, 300);
-  const [activeGroup, setActiveGroup] = useState<ProductGroup>('GROUP_1');
+  // null = تبويب "الكل" (الافتراضي) — يشمل المنتجات بلا فئة أيضاً، بخلاف السلوك
+  // القديم الذي كان يفرض تبويباً واحداً من أربعة ثابتة دائماً نشطاً
+  const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
+  const { data: categories } = useQuery({ queryKey: ['categories'], queryFn: fetchCategories });
 
   const [lines, setLines] = useState<CartLine[]>([]);
   const [customerId, setCustomerId] = useState('');
@@ -184,7 +187,7 @@ export default function PosPage() {
     saleMutation.mutate();
   }
 
-  const groupProducts = products?.filter((p) => p.group === activeGroup);
+  const groupProducts = activeCategoryId ? products?.filter((p) => p.categoryId === activeCategoryId) : products;
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -192,14 +195,17 @@ export default function PosPage() {
         <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('pos.searchPlaceholder')} />
 
         <div className="flex flex-wrap gap-2">
-          {PRODUCT_GROUPS.map((g) => (
+          <Button type="button" variant={activeCategoryId === null ? 'default' : 'outline'} onClick={() => setActiveCategoryId(null)}>
+            {t('pos.allCategoriesTab')}
+          </Button>
+          {categories?.map((c) => (
             <Button
-              key={g}
+              key={c.id}
               type="button"
-              variant={activeGroup === g ? 'default' : 'outline'}
-              onClick={() => setActiveGroup(g)}
+              variant={activeCategoryId === c.id ? 'default' : 'outline'}
+              onClick={() => setActiveCategoryId(c.id)}
             >
-              {t(`productGroups.${g}`)}
+              {c.name}
             </Button>
           ))}
         </div>

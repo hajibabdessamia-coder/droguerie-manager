@@ -37,6 +37,60 @@ function formatDate(value: Date): string {
   return value.toLocaleDateString('ar-MA');
 }
 
+// دعم لغتين لقالب الفاتورة المطبوعة فقط (أكثر مستند يصل للزبون مباشرة) — راجع
+// InvoiceLocale أدناه. بقية هذا الملف (buildSummaryReportHtml وتقارير Excel) لا يزال
+// عربياً فقط: ترجمتها تتطلب آلية i18n عامة على مستوى الواجهة الخلفية بأكملها
+// (رسائل الأخطاء، DTOs...)، وهذا نطاق أوسع من إصلاح قالب فاتورة واحد
+export type InvoiceLocale = 'ar' | 'fr';
+
+const INVOICE_LABELS: Record<InvoiceLocale, {
+  invoiceNumberPrefix: string;
+  productCol: string;
+  qtyCol: string;
+  priceCol: string;
+  totalCol: string;
+  subtotal: string;
+  discount: string;
+  tax: string;
+  grandTotal: string;
+  paid: string;
+  changeDue: string;
+  walkInCustomer: string;
+}> = {
+  ar: {
+    invoiceNumberPrefix: 'فاتورة رقم',
+    productCol: 'المنتج',
+    qtyCol: 'الكمية',
+    priceCol: 'السعر',
+    totalCol: 'المجموع',
+    subtotal: 'المجموع الفرعي',
+    discount: 'الخصم',
+    tax: 'الضريبة',
+    grandTotal: 'الإجمالي',
+    paid: 'المدفوع',
+    changeDue: 'الباقي',
+    walkInCustomer: 'زبون عابر',
+  },
+  fr: {
+    invoiceNumberPrefix: 'Facture N°',
+    productCol: 'Produit',
+    qtyCol: 'Quantité',
+    priceCol: 'Prix',
+    totalCol: 'Total',
+    subtotal: 'Sous-total',
+    discount: 'Remise',
+    tax: 'Taxe',
+    grandTotal: 'Total général',
+    paid: 'Payé',
+    changeDue: 'Monnaie rendue',
+    walkInCustomer: 'Client de passage',
+  },
+};
+
+export function invoiceWalkInCustomerLabel(locale: InvoiceLocale): string {
+  return INVOICE_LABELS[locale].walkInCustomer;
+}
+
 interface ProductStat {
   name: string;
   qty: number;
@@ -126,14 +180,29 @@ export interface InvoicePdfData {
     rc?: string | null;
     patente?: string | null;
   };
+  locale?: InvoiceLocale;
 }
 
 export function buildInvoiceHtml(data: InvoicePdfData): string {
+  const locale = data.locale ?? 'ar';
+  const dir = locale === 'ar' ? 'rtl' : 'ltr';
+  const l = INVOICE_LABELS[locale];
+
   const itemRow = (item: InvoicePdfData['items'][number]) =>
     `<tr><td>${item.name}</td><td>${item.quantity}</td><td>${formatCurrency(item.unitPrice)}</td><td>${formatCurrency(item.total)}</td></tr>`;
 
+  // سطر أرقام تعريف المحل (IF/ICE/RC/Patente) — كانت البيانات تُستقبَل هنا (راجع
+  // InvoicePdfData.store) لكن لم تكن تُطبَع إطلاقاً، خلافاً لنسخة الشاشة المطابقة
+  // (frontend/pos/receipt/[id]/page-client.tsx) التي تعرضها. مُصلَح هنا.
+  const taxIdLines = [
+    data.store.ifNumber ? `<p class="muted">IF: ${data.store.ifNumber}</p>` : '',
+    data.store.ice ? `<p class="muted">ICE: ${data.store.ice}</p>` : '',
+    data.store.rc ? `<p class="muted">RC: ${data.store.rc}</p>` : '',
+    data.store.patente ? `<p class="muted">Patente: ${data.store.patente}</p>` : '',
+  ].join('');
+
   return `<!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="${locale}" dir="${dir}">
 <head>
 <meta charset="utf-8" />
 <style>
@@ -142,7 +211,7 @@ export function buildInvoiceHtml(data: InvoicePdfData): string {
   .header h1 { font-size: 20px; margin: 0 0 4px; }
   .muted { color: #666; font-size: 12px; }
   table { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 13px; }
-  th, td { border-bottom: 1px solid #ddd; padding: 6px 8px; text-align: right; }
+  th, td { border-bottom: 1px solid #ddd; padding: 6px 8px; text-align: start; }
   th { background: #f5f5f5; }
   .totals { width: 260px; margin-inline-start: auto; font-size: 13px; }
   .totals div { display: flex; justify-content: space-between; padding: 3px 0; }
@@ -156,25 +225,26 @@ export function buildInvoiceHtml(data: InvoicePdfData): string {
       ${data.store.address ? `<p class="muted">${data.store.address}</p>` : ''}
       ${data.store.phone ? `<p class="muted">${data.store.phone}</p>` : ''}
     </div>
-    <div style="text-align:left">
-      <p style="font-size:16px;font-weight:bold">فاتورة رقم ${data.invoiceNumber}</p>
+    <div style="text-align:end">
+      <p style="font-size:16px;font-weight:bold">${l.invoiceNumberPrefix} ${data.invoiceNumber}</p>
       <p class="muted">${formatDate(data.createdAt)}</p>
       <p class="muted">${data.customerName}</p>
+      ${taxIdLines}
     </div>
   </div>
 
   <table>
-    <thead><tr><th>المنتج</th><th>الكمية</th><th>السعر</th><th>المجموع</th></tr></thead>
+    <thead><tr><th>${l.productCol}</th><th>${l.qtyCol}</th><th>${l.priceCol}</th><th>${l.totalCol}</th></tr></thead>
     <tbody>${data.items.map(itemRow).join('')}</tbody>
   </table>
 
   <div class="totals">
-    <div><span>المجموع الفرعي</span><span>${formatCurrency(data.subtotal)}</span></div>
-    <div><span>الخصم</span><span>${formatCurrency(data.discount)}</span></div>
-    <div><span>الضريبة (${data.taxRate}%)</span><span>${formatCurrency(data.taxAmount)}</span></div>
-    <div class="grand"><span>الإجمالي</span><span>${formatCurrency(data.total)}</span></div>
-    <div><span>المدفوع</span><span>${formatCurrency(data.amountPaid)}</span></div>
-    <div><span>الباقي</span><span>${formatCurrency(data.changeDue)}</span></div>
+    <div><span>${l.subtotal}</span><span>${formatCurrency(data.subtotal)}</span></div>
+    <div><span>${l.discount}</span><span>${formatCurrency(data.discount)}</span></div>
+    <div><span>${l.tax} (${data.taxRate}%)</span><span>${formatCurrency(data.taxAmount)}</span></div>
+    <div class="grand"><span>${l.grandTotal}</span><span>${formatCurrency(data.total)}</span></div>
+    <div><span>${l.paid}</span><span>${formatCurrency(data.amountPaid)}</span></div>
+    <div><span>${l.changeDue}</span><span>${formatCurrency(data.changeDue)}</span></div>
   </div>
 </body>
 </html>`;

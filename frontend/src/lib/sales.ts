@@ -51,8 +51,8 @@ export async function deleteSale(id: string): Promise<void> {
   await apiClient.delete(`/sales/${id}`);
 }
 
-export async function downloadSaleInvoicePdf(id: string, invoiceNumber: string): Promise<void> {
-  const response = await apiClient.get(`/sales/${id}/pdf`, { responseType: 'blob' });
+export async function downloadSaleInvoicePdf(id: string, invoiceNumber: string, locale: 'ar' | 'fr' = 'ar'): Promise<void> {
+  const response = await apiClient.get(`/sales/${id}/pdf`, { params: { locale }, responseType: 'blob' });
   const blobUrl = window.URL.createObjectURL(response.data);
   const link = document.createElement('a');
   link.href = blobUrl;

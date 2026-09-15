@@ -1,6 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsEnum, IsInt, IsNumber, IsOptional, IsString, Min, MinLength } from 'class-validator';
-import { ProductGroup } from '../../common/enums';
+import { IsInt, IsNumber, IsOptional, IsString, Min, MinLength } from 'class-validator';
 
 export class CreateProductDto {
   @IsString()
@@ -15,8 +14,12 @@ export class CreateProductDto {
   internalCode: string;
 
   @IsOptional()
-  @IsEnum(ProductGroup)
-  group?: ProductGroup;
+  @IsString()
+  categoryId?: string;
+
+  @IsOptional()
+  @IsString()
+  unitId?: string;
 
   @IsOptional()
   @IsString()

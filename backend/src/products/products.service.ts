@@ -17,7 +17,7 @@ export class ProductsService {
   async findAll(query: QueryProductDto) {
     const where: Prisma.ProductWhereInput = {
       isActive: true,
-      group: query.group,
+      categoryId: query.categoryId,
       manufacturerId: query.manufacturerId,
       ...(query.search && {
         OR: [
@@ -29,7 +29,7 @@ export class ProductsService {
 
     const products = await this.prisma.product.findMany({
       where,
-      include: { manufacturer: true },
+      include: { manufacturer: true, category: true, unit: true },
       orderBy: { name: 'asc' },
     });
 
@@ -39,7 +39,7 @@ export class ProductsService {
   async findOne(id: string) {
     const product = await this.prisma.product.findUnique({
       where: { id },
-      include: { manufacturer: true },
+      include: { manufacturer: true, category: true, unit: true },
     });
     if (!product) throw new NotFoundException('المنتج غير موجود');
     return product;
@@ -73,7 +73,7 @@ export class ProductsService {
   async lowStock() {
     const products = await this.prisma.product.findMany({
       where: { isActive: true },
-      include: { manufacturer: true },
+      include: { manufacturer: true, category: true, unit: true },
       orderBy: { name: 'asc' },
     });
     return products.filter((p) => p.quantity <= p.minStock);

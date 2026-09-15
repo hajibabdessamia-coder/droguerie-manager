@@ -67,7 +67,7 @@ export default function SaleDetailPage() {
   });
 
   const pdfMutation = useMutation({
-    mutationFn: () => downloadSaleInvoicePdf(id, sale!.invoiceNumber),
+    mutationFn: () => downloadSaleInvoicePdf(id, sale!.invoiceNumber, locale),
   });
 
   const deleteMutation = useMutation({

@@ -12,10 +12,11 @@ import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { createManufacturer, fetchManufacturers } from '@/lib/manufacturers';
+import { createCategory, fetchCategories } from '@/lib/categories';
+import { createUnit, fetchUnits } from '@/lib/units';
 import { createProduct, updateProduct, uploadProductImage, type ProductInput } from '@/lib/products';
-import { PRODUCT_GROUPS } from '@/lib/product-groups';
 import { useLocale } from '@/i18n/locale-provider';
-import type { Product, ProductGroup } from '@/types';
+import type { Product } from '@/types';
 
 export function ProductForm({ product }: { product?: Product }) {
   const router = useRouter();
@@ -24,10 +25,13 @@ export function ProductForm({ product }: { product?: Product }) {
   const isEdit = Boolean(product);
 
   const { data: manufacturers } = useQuery({ queryKey: ['manufacturers'], queryFn: fetchManufacturers });
+  const { data: categories } = useQuery({ queryKey: ['categories'], queryFn: fetchCategories });
+  const { data: units } = useQuery({ queryKey: ['units'], queryFn: fetchUnits });
 
   const [name, setName] = useState(product?.name ?? '');
   const [internalCode, setInternalCode] = useState(product?.internalCode ?? '');
-  const [group, setGroup] = useState<ProductGroup>(product?.group ?? 'GROUP_1');
+  const [categoryId, setCategoryId] = useState(product?.categoryId ?? '');
+  const [unitId, setUnitId] = useState(product?.unitId ?? '');
   const [manufacturerId, setManufacturerId] = useState(product?.manufacturerId ?? '');
   const [purchasePrice, setPurchasePrice] = useState(product?.purchasePrice ?? '');
   const [retailPrice, setRetailPrice] = useState(product?.retailPrice ?? '');
@@ -48,7 +52,8 @@ export function ProductForm({ product }: { product?: Product }) {
       const input: ProductInput = {
         name,
         internalCode,
-        group,
+        categoryId: categoryId || undefined,
+        unitId: unitId || undefined,
         manufacturerId: manufacturerId || undefined,
         purchasePrice: Number(purchasePrice),
         retailPrice: Number(retailPrice),
@@ -84,6 +89,22 @@ export function ProductForm({ product }: { product?: Product }) {
     const manufacturer = await createManufacturer(value);
     await queryClient.invalidateQueries({ queryKey: ['manufacturers'] });
     setManufacturerId(manufacturer.id);
+  }
+
+  async function handleAddCategory() {
+    const value = window.prompt(t('productForm.addCategoryPrompt'));
+    if (!value) return;
+    const category = await createCategory(value);
+    await queryClient.invalidateQueries({ queryKey: ['categories'] });
+    setCategoryId(category.id);
+  }
+
+  async function handleAddUnit() {
+    const value = window.prompt(t('productForm.addUnitPrompt'));
+    if (!value) return;
+    const unit = await createUnit(value);
+    await queryClient.invalidateQueries({ queryKey: ['units'] });
+    setUnitId(unit.id);
   }
 
   function handleSubmit(e: FormEvent) {
@@ -125,14 +146,36 @@ export function ProductForm({ product }: { product?: Product }) {
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="group">{t('productForm.groupLabel')}</Label>
-              <Select id="group" value={group} onChange={(e) => setGroup(e.target.value as ProductGroup)}>
-                {PRODUCT_GROUPS.map((g) => (
-                  <option key={g} value={g}>
-                    {t(`productGroups.${g}`)}
-                  </option>
-                ))}
-              </Select>
+              <Label htmlFor="categoryId">{t('productForm.categoryLabel')}</Label>
+              <div className="flex gap-2">
+                <Select id="categoryId" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+                  <option value="">{t('productForm.noCategory')}</option>
+                  {categories?.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </Select>
+                <Button type="button" variant="outline" size="icon" onClick={handleAddCategory}>
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="unitId">{t('productForm.unitLabel')}</Label>
+              <div className="flex gap-2">
+                <Select id="unitId" value={unitId} onChange={(e) => setUnitId(e.target.value)}>
+                  <option value="">{t('productForm.noUnit')}</option>
+                  {units?.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name}
+                    </option>
+                  ))}
+                </Select>
+                <Button type="button" variant="outline" size="icon" onClick={handleAddUnit}>
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="manufacturerId">{t('productForm.manufacturerLabel')}</Label>

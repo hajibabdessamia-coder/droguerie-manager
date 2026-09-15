@@ -12,6 +12,7 @@ import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useDebouncedValue } from '@/hooks/use-debounce';
 import { fetchManufacturers } from '@/lib/manufacturers';
+import { fetchCategories } from '@/lib/categories';
 import { deleteProduct, fetchProducts } from '@/lib/products';
 import { formatCurrency } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth-store';
@@ -25,16 +26,19 @@ export default function ProductsPage() {
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search, 300);
   const [manufacturerId, setManufacturerId] = useState('');
+  const [categoryId, setCategoryId] = useState('');
   const [lowStockOnly, setLowStockOnly] = useState(false);
 
   const { data: manufacturers } = useQuery({ queryKey: ['manufacturers'], queryFn: fetchManufacturers });
+  const { data: categories } = useQuery({ queryKey: ['categories'], queryFn: fetchCategories });
 
   const { data: products, isLoading, isError } = useQuery({
-    queryKey: ['products', debouncedSearch, manufacturerId, lowStockOnly],
+    queryKey: ['products', debouncedSearch, manufacturerId, categoryId, lowStockOnly],
     queryFn: () =>
       fetchProducts({
         search: debouncedSearch || undefined,
         manufacturerId: manufacturerId || undefined,
+        categoryId: categoryId || undefined,
         lowStock: lowStockOnly,
       }),
   });
@@ -92,6 +96,18 @@ export default function ProductsPage() {
               </option>
             ))}
           </Select>
+          <Select
+            value={categoryId}
+            onChange={(e) => setCategoryId(e.target.value)}
+            className="w-auto min-w-[150px]"
+          >
+            <option value="">{t('products.allCategories')}</option>
+            {categories?.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </Select>
           <Button
             type="button"
             variant={lowStockOnly ? 'default' : 'outline'}
@@ -110,6 +126,7 @@ export default function ProductsPage() {
               <tr className="border-b border-border bg-muted/30 text-right text-muted-foreground">
                 <th className="px-4 py-3 font-medium">{t('products.columns.product')}</th>
                 <th className="px-4 py-3 font-medium">{t('products.columns.code')}</th>
+                <th className="px-4 py-3 font-medium">{t('products.columns.category')}</th>
                 <th className="px-4 py-3 font-medium">{t('products.columns.quantity')}</th>
                 <th className="px-4 py-3 font-medium">{t('products.columns.retailPrice')}</th>
                 <th className="px-4 py-3 font-medium">{t('products.columns.wholesalePrice')}</th>
@@ -120,21 +137,21 @@ export default function ProductsPage() {
               {isLoading &&
                 Array.from({ length: 6 }).map((_, i) => (
                   <tr key={i} className="border-b border-border">
-                    <td className="px-4 py-3" colSpan={6}>
+                    <td className="px-4 py-3" colSpan={isAdmin ? 7 : 6}>
                       <Skeleton className="h-8 w-full" />
                     </td>
                   </tr>
                 ))}
               {!isLoading && isError && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-destructive">
+                  <td colSpan={isAdmin ? 7 : 6} className="px-4 py-10 text-center text-destructive">
                     {t('products.loadError')}
                   </td>
                 </tr>
               )}
               {!isLoading && !isError && products?.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
+                  <td colSpan={isAdmin ? 7 : 6} className="px-4 py-10 text-center text-muted-foreground">
                     {t('products.emptyState')}
                   </td>
                 </tr>
@@ -157,9 +174,11 @@ export default function ProductsPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">{p.internalCode}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{p.category?.name ?? '—'}</td>
                     <td className="px-4 py-3">
                       <Badge variant={low ? 'destructive' : 'secondary'}>
                         {p.quantity} / {p.minStock}
+                        {p.unit ? ` ${p.unit.name}` : ''}
                       </Badge>
                     </td>
                     <td className="px-4 py-3">{formatCurrency(p.retailPrice, locale)}</td>

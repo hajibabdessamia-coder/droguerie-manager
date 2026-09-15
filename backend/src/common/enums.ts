@@ -5,14 +5,6 @@
 export const Role = { ADMIN: 'ADMIN', SELLER: 'SELLER' } as const;
 export type Role = (typeof Role)[keyof typeof Role];
 
-export const ProductGroup = {
-  GROUP_1: 'GROUP_1',
-  GROUP_2: 'GROUP_2',
-  GROUP_3: 'GROUP_3',
-  GROUP_4: 'GROUP_4',
-} as const;
-export type ProductGroup = (typeof ProductGroup)[keyof typeof ProductGroup];
-
 export const StockMovementType = { SALE: 'SALE', PURCHASE: 'PURCHASE', ADJUSTMENT: 'ADJUSTMENT' } as const;
 export type StockMovementType = (typeof StockMovementType)[keyof typeof StockMovementType];
 

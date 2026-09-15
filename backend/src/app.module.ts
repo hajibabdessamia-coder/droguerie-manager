@@ -7,6 +7,8 @@ import { HealthModule } from './health/health.module';
 import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
 import { ManufacturersModule } from './manufacturers/manufacturers.module';
+import { CategoriesModule } from './categories/categories.module';
+import { UnitsModule } from './units/units.module';
 import { ProductsModule } from './products/products.module';
 import { CustomersModule } from './customers/customers.module';
 import { SuppliersModule } from './suppliers/suppliers.module';
@@ -31,6 +33,8 @@ import { LicenseGuard } from './auth/guards/license.guard';
     AuditModule,
     AuthModule,
     ManufacturersModule,
+    CategoriesModule,
+    UnitsModule,
     ProductsModule,
     CustomersModule,
     SuppliersModule,

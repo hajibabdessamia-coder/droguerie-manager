@@ -3,11 +3,24 @@ export type CustomerType = 'WHOLESALE' | 'RETAIL';
 export type InvoiceType = 'TICKET' | 'LEGAL';
 export type PaymentMethod = 'CASH' | 'CREDIT';
 export type PriceType = 'WHOLESALE' | 'RETAIL' | 'CUSTOM';
-export type ProductGroup = 'GROUP_1' | 'GROUP_2' | 'GROUP_3' | 'GROUP_4';
 
 export interface Manufacturer {
   id: string;
   name: string;
+}
+
+// فئة ووحدة منتج قابلتان للإنشاء والتسمية والحذف بالكامل من طرف المستخدم — راجع
+// إعدادات > الفئات والوحدات. لا تصنيف ثابت مبرمجاً مسبقاً (بديل GROUP_1..GROUP_4 القديم)
+export interface Category {
+  id: string;
+  name: string;
+  sortOrder: number;
+}
+
+export interface Unit {
+  id: string;
+  name: string;
+  sortOrder: number;
 }
 
 export interface Product {
@@ -15,7 +28,10 @@ export interface Product {
   name: string;
   imageUrl?: string | null;
   internalCode: string;
-  group: ProductGroup;
+  categoryId?: string | null;
+  category?: Category | null;
+  unitId?: string | null;
+  unit?: Unit | null;
   manufacturerId?: string | null;
   manufacturer?: Manufacturer | null;
   purchasePrice: string;
