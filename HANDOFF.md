@@ -20,25 +20,27 @@ desktop app instead of resuming the cloud deployment. That pivot is what Stages
 
 ## Where things stand right now
 
-**Updated 2026-08-17 — corrected during the Phase 11 pre-release hardening
-session; everything below this note in the rest of the file is historical
-narrative for Stage 0–2 and is still accurate as history, just no longer
-"current."**
+**Updated 2026-09-15 — the project was renamed and genericized end-to-end
+(pharma-specific POS → generic multi-business POS/inventory, "L7ssab
+Manager") in a 5-phase session. See "Phase 13 — L7ssab Manager
+genericization" near the end of this file for the full writeup. Everything
+between this note and that section is historical narrative for Stage 0–2 and
+Phases 11–12 and is still accurate as history, just no longer "current" —
+the product is no longer pharma/electrical-hardware-specific as described
+below, it's general-purpose now.**
 
-Branch `feature/sqlite-migration`, HEAD at commit `b5a3302` ("Bump version to
-1.0.0 for first public release"), tag `v1.0.0` points at the same commit.
-Stage 1, Stage 2, and Stage 3 (icon, backup/restore, portable-exe fix via
-`nsis`+`zip` win targets instead of the broken `portable` target, production
-hardening, Windows code signing with a self-signed dev certificate) are all
-done and were part of the `v1.0.0` tag. This branch has **not** been pushed to
-GitHub and the `v1.0.0` tag has not been pushed either — both remain local
-only, deliberately deferred, ask before pushing.
+Branch `feature/sqlite-migration`, HEAD at commit `1ad6cab` ("feat: barcode
+support (EAN-13) — field, scan-to-cart, label printing"). Full commit chain
+for Phase 13, oldest to newest: `0fd46bd` (pre-work checkpoint) →
+`93fef5c` (genericize branding) → `81d11ad` (Categories/Units + invoice fix)
+→ `1b642a9` (full i18n + language switcher + RTL/LTR) → `1ad6cab` (barcode).
+Base was `a11cf3b` ("fix: Phase 12 post-commit license fixes"), which is
+where the older parts of this file leave off. **Still not pushed to GitHub
+— ask before pushing**, same standing rule as always in this file.
 
-A Phase 10 audit and Phase 11 pre-release hardening pass have since run on top
-of `v1.0.0` (uncommitted as of this note) — see "Phase 11 — Pre-release
-hardening" near the end of this file for exactly what changed. Frontend
-localization (Arabic/French, `frontend/src/i18n/`) is also in progress and
-uncommitted, predating and independent of Phase 11.
+A Phase 10 audit and Phase 11 pre-release hardening pass ran on top of
+`v1.0.0`; Phase 12 added offline trial/licensing. See their sections below
+for exactly what changed. All of that predates and is unrelated to Phase 13.
 
 ## Stage 1 — PostgreSQL → SQLite (full detail)
 
@@ -657,6 +659,214 @@ list above) — not yet done as of this note. Nothing macOS-related, no
 CI/push, no auto-update, no further trial/licensing redesign, and no Phase
 13 work should start before that.
 
+## Phase 13 — L7ssab Manager genericization (2026-09-15)
+
+The user asked to turn the app from a pharma/electrical-hardware-specific POS
+into a fully generic sales/inventory system for any business, with full
+bilingual (Arabic/French) support end-to-end, and barcode support (which
+didn't exist at all). Done as 5 sequential phases, each committed separately,
+each confirmed with the user before moving to the next. Mandatory safety
+steps done before any code changed: full backup to
+`Desktop/pharma-manager-BACKUP-2026-09-15` (source + `.git` + both SQLite
+files; `node_modules`/`.next`/`dist-builds` excluded as regenerable — ~4.6 GB
+saved), and an initial checkpoint commit (`0fd46bd`) of whatever was already
+uncommitted in the working tree, since the project turned out to already be
+under git (contrary to the original instruction's assumption it might not be).
+
+### Phase 1 — Audit (read-only, no code changed)
+
+Found the app was already structurally generic — `Product`/`Sale`/`Customer`/
+`Supplier` etc. have zero pharma-specific fields, and `frontend/src/i18n/`
+was already a complete, type-safe two-language system (`fr.ts`'s
+`: Dictionary` annotation makes any missing/extra key a compile error).
+The actual problems:
+- ~14 literal `pharma`/`العقاقير` occurrences in user-visible text and
+  package/identifier names (branding only, see Phase 2).
+- **No language switcher existed anywhere except the login screen.** This
+  was the real cause of "French mode looks half-translated" — it's not a
+  translation bug, there was simply no way to change language once logged
+  in. Fixed in Phase 4.
+- Backend had **zero** i18n — every thrown exception message, every report/
+  Excel/PDF string, was a hardcoded Arabic literal. Fixed in Phase 4.
+- Product categorization was 4 hardcoded tabs (`GROUP_1..4`, `common/
+  enums.ts`), not a real user-manageable table. Fixed in Phase 3.
+- No unit-of-measure concept existed at all (not "hardcoded to pharmacy
+  units" as originally assumed — just absent). Added in Phase 3.
+- Real bug found: the invoice PDF (`pdf.util.ts`'s `buildInvoiceHtml`)
+  received the store's IF/ICE/RC/Patente tax-ID fields but never rendered
+  them, unlike the on-screen receipt which did. Fixed in Phase 3.
+- **Zero** barcode support anywhere — no field, no scan logic, no printing.
+  `Product.internalCode` (already searched from POS) was the only thing
+  resembling it. Built from scratch in Phase 5.
+
+### Phase 2 — Genericize branding (commit `93fef5c`)
+
+Replaced every user-visible pharma/electrical-hardware string with generic
+wording, in both `ar.ts` and `fr.ts` (`fr.ts` had its own domain wording,
+"quincaillerie électrique", not just an Arabic problem). App name became
+"L7ssab Manager" everywhere (metadata, Swagger title, sidebar/login/activate
+logo — the logo glyph was a bare Arabic letter `ع` hardcoded even in French
+mode; replaced with a locale-neutral "L7" mark). `package.json` names,
+`render.yaml`, `build-mac.yml`, `docker-compose.yml` renamed
+`pharma-manager-* → l7ssab-manager-*`. Seeded admin email changed
+`admin@pharma.local → admin@l7ssab.local` in `seed.ts`/`seed.production.ts`
+— **new installs only**; the existing `dev.db` keeps its original
+`admin@pharma.local` account untouched (verified via MD5 checksum, unchanged
+by this phase).
+
+**Four internal identifiers were deliberately left alone**, each with an
+in-code comment explaining why (search `مُجمَّد عمداً` — "deliberately frozen"
+— to find all four): `license/device-id.util.ts`'s `APP_SALT` (renaming
+invalidates every already-issued license, no upside since it's invisible to
+users), `electron/main.js`'s `pharma-manager.db` filename (renaming makes
+the app copy a fresh empty template instead of opening a real customer's
+existing data), and two `localStorage` keys — `store/auth-store.ts`'s
+`'pharma-auth'` and `i18n/locale-provider.tsx`'s `'pharma-manager-locale'`
+(renaming either logs out / resets the language for every existing user,
+for zero benefit since neither is user-visible).
+
+### Phase 3 — Categories, Units, invoice fix (commit `81d11ad`)
+
+New `Category` and `Unit` Prisma models, both full CRUD (create/rename/
+delete) via new `backend/src/categories/` and `backend/src/units/` modules,
+managed from a new "الفئات / الوحدات" section in Settings
+(`frontend/src/components/settings/named-list-manager.tsx`, a reusable
+create/rename/delete list widget). `Product.group` (the old fixed enum)
+removed entirely; `Product.categoryId`/`unitId` added, both optional with
+`onDelete: SetNull` — **deleting a category or unit is always safe**, it
+just un-sets the field on any product that had it, never blocks the delete
+or touches the product otherwise. `ProductGroup` removed from
+`common/enums.ts`. POS's 4 fixed group tabs became dynamic category tabs
+sourced from the new table, defaulting to an "All" tab (previously one of
+the 4 fixed groups was always force-selected, hiding anything uncategorized).
+
+**Migration** (`20260915103500_add_categories_and_units`) needed hand-editing
+after the raw `prisma migrate diff` output, which — as generated — silently
+**dropped** the `group` column with no data-preservation step at all (a
+plain `prisma migrate dev` would have destroyed every product's
+categorization with no warning). The hand-edited version seeds 4 categories
+named to match exactly what the UI already showed for `GROUP_1..4` (`الفئة
+الأولى`..`الفئة الرابعة`) plus one default unit (`قطعة`), then backfills
+every product's new `categoryId`/`unitId` from its old `group` value in the
+same statement that rebuilds the table (SQLite requires a full table rebuild
+to add a `UNIQUE`/FK column, there's no in-place `ALTER`). **Tested against
+a throwaway copy of the real `dev.db` first** (all 15 tables, same row
+counts, `PRAGMA foreign_key_check` empty) and the SQL was shown to the user
+for approval before being applied to the real `dev.db` — required by the
+session's standing migration-safety rule, followed for every schema change
+in this phase and Phase 5's below.
+
+Invoice fix: `buildInvoiceHtml` (`pdf.util.ts`) now actually renders the
+IF/ICE/RC/Patente block it always received but silently dropped, and gained
+a `locale` parameter (labels, `dir`/`lang`, date/currency formatting) —
+scoped to just this one customer-facing document; the ~260 other backend
+Arabic strings (error messages, the summary report, Excel exports) were
+explicitly deferred to Phase 4 as a distinct, larger effort needing a real
+i18n mechanism rather than one-off translation.
+
+### Phase 4 — Full i18n, language switcher, RTL/LTR (commit `1b642a9`)
+
+**The actual fix for the originally-reported bug**: new `LocaleToggle`
+(`frontend/src/components/locale-toggle.tsx`) in the Topbar, same
+icon-button pattern as the existing `ThemeToggle`. Before this, `setLocale`
+was only ever called from the login screen — there was no way to change
+language after signing in.
+
+New backend i18n system, `backend/src/common/i18n/`:
+- `messages.ts` — central `ERROR_CODE → {ar, fr}` dictionary.
+- `locale.util.ts` — `resolveLocale(req)` reads `?locale=` then the
+  `X-Locale` header.
+- `http-exception.filter.ts` (new global filter) — translates any exception
+  whose response body carries a known `code` (services now throw
+  `new XException({ code: 'Y', params? })` instead of a literal string,
+  across every service — auth, products, sales, purchases, customers,
+  suppliers, categories, units, manufacturers, backup, uploads, license);
+  replaces class-validator's English-by-default validation-error arrays with
+  one translated generic message; passes through anything it doesn't
+  recognize unchanged (e.g. `LicenseGuard`'s `{ code: 'LICENSE_REQUIRED' }`,
+  which the frontend reads structurally, not as display text).
+- `prisma-exception.filter.ts` updated to the same mechanism.
+- `frontend/src/lib/api-client.ts` now attaches the current UI locale as
+  `X-Locale` on **every** request — no per-call plumbing needed anywhere.
+
+Reports/invoice extended to be fully bilingual (sheet titles, column
+headers, period/payment-method/customer-type labels, RTL/LTR sheet
+direction) — `pdf.util.ts`, `excel.util.ts`, `reports.service.ts`,
+`period.util.ts`, new `reports/report-labels.ts`. Customer/product/seller
+names are correctly left untranslated (user data, not UI chrome — same rule
+already applied to store name). `reports-scheduler.service.ts` (unattended
+cron, no HTTP request to read a locale from) keeps defaulting to Arabic,
+unchanged.
+
+RTL/LTR sweep: 18 of the audit's 22 flagged spots were real — hardcoded
+`text-right`/`text-left` converted to logical `text-start`/`text-end` across
+12 files. **The other 4 turned out to be false positives on re-inspection**:
+2 were comments *documenting* an already-correct fix (matched by a naive
+grep on the word, not actual usage), and 2 (the mobile sidebar drawer's
+`translate-x` slide direction) were already handled correctly via an
+explicit `isRtl` check, because Tailwind has no logical-property equivalent
+for that one.
+
+### Phase 5 — Barcode (EAN-13) (commit `1ad6cab`)
+
+`Product.barcode String? @unique` — purely additive migration
+(`20260915120000_add_product_barcode`, one nullable column + its unique
+index, nothing else touched; SQLite allows multiple `NULL`s under a unique
+index). Also shown to the user and approved before applying, same rule as
+Phase 3.
+
+- `backend/src/products/barcode.util.ts` — generates valid EAN-13 codes
+  under the `20`/`21` prefix range GS1 reserves for internal/in-store use
+  (won't collide with a real manufacturer's GTIN), standard mod-10 check
+  digit. 7 unit tests, including a known-correct code straight from GS1's
+  own documentation (`4006381333931`).
+- `GET /products/generate-barcode` — checks for a DB collision before
+  returning (retries up to 20×, effectively impossible to exhaust). DTO
+  validation accepts a general alphanumeric shape, **not** EAN-13-only,
+  since stock bought from outside suppliers may already carry UPC-A,
+  EAN-8, or another format printed on the package.
+- `jsbarcode` (zero runtime deps) renders barcodes client-side as SVG —
+  used in the product form's live preview and the new
+  `frontend/src/app/(app)/products/barcode-labels/page.tsx` label-printing
+  page (pick products + copy count, print via the browser dialog — same
+  print-only-content CSS pattern as the existing receipt page).
+- POS scan-to-cart: the existing product search box doubles as the scan
+  target (no new field). A scanner types the code and sends Enter fast; the
+  `Enter` handler does a **fresh** API call with the just-scanned text
+  (not the debounced list, which can still be stale at scanner speed) and
+  looks for an **exact** barcode/`internalCode` match — `contains`
+  wouldn't do, a partial match could add the wrong product — adding it
+  straight to the cart and clearing the box.
+
+### Validation performed (all 5 phases)
+
+Every phase: `npx tsc --noEmit` clean (both frontend and backend), full test
+suites passing (backend grew from 43 → 50 tests across the session, 7 new
+for `barcode.util.ts`; frontend steady at 16), both production builds
+(`next build`, `nest build`) succeeding. Every migration was tested against
+a throwaway copy of the real `dev.db` before being shown to and approved by
+the user, then applied and re-verified in place. Phases 3 through 5 each
+included a **live smoke test** — actually starting the real backend against
+the real (already-migrated) `dev.db` and exercising it over HTTP (login,
+category/unit CRUD, bilingual invoice PDF generation checked by unzipping
+the resulting `.xlsx`/rendering the HTML directly and grepping for the
+expected French labels, barcode generate → assign → exact-match search →
+duplicate-rejection) — with every piece of test data created during these
+smoke tests cleaned back out afterward and the database's row counts
+re-verified unchanged before moving on.
+
+### What's stale as of Phase 13 and needs regenerating before the next package build
+
+- **`electron/resources/db-template.sqlite` was NOT regenerated during
+  Phase 13** — it still predates the `Category`/`Unit`/`barcode` schema
+  changes and the `admin@l7ssab.local` seed email change. Must run
+  `npm run build:db-template` (inside `electron/`) before the next Windows
+  package/build, exactly like the same standing warning in the Phase 11
+  section above for the `mustChangePassword` column.
+- The signing certificate (`electron/resources/dev-signing-cert.pfx`) and
+  its password are unchanged by Phase 13 — same `CSC_KEY_PASSWORD`-driven
+  mechanism as Phase 11 established, nothing here needed a new certificate.
+
 ## What NOT to do without asking first
 
 - Don't push this branch or trigger the mac CI workflow — needs explicit confirmation.
@@ -670,3 +880,15 @@ CI/push, no auto-update, no further trial/licensing redesign, and no Phase
   losing it means no new licenses can ever be issued without shipping a new
   public key (and thus invalidating every previously-issued license) to
   every existing customer. It is gitignored by design; back it up offline.
+- Don't rename the 4 identifiers Phase 13 deliberately froze (`APP_SALT` in
+  `license/device-id.util.ts`, the `pharma-manager.db` filename in
+  `electron/main.js`, and the two `localStorage` keys `'pharma-auth'` /
+  `'pharma-manager-locale'`) — each has an in-code comment explaining the
+  real cost (invalidated licenses / apparently-lost customer data / logged-out
+  users) for zero user-visible benefit, since none of the four are ever seen.
+- Don't package/build without first running `npm run build:db-template` in
+  `electron/` if `backend/prisma/schema.prisma` or `seed.production.ts` has
+  changed since the last template build — it's a gitignored build artifact
+  that does NOT regenerate itself, and shipping a stale one means real
+  customer installs get a database missing whatever changed (see "What's
+  stale as of Phase 13" above for the exact reason this matters right now).
