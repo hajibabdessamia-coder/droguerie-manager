@@ -855,17 +855,48 @@ duplicate-rejection) — with every piece of test data created during these
 smoke tests cleaned back out afterward and the database's row counts
 re-verified unchanged before moving on.
 
-### What's stale as of Phase 13 and needs regenerating before the next package build
+### Final test build (2026-09-15, same day, after Phase 13)
 
-- **`electron/resources/db-template.sqlite` was NOT regenerated during
-  Phase 13** — it still predates the `Category`/`Unit`/`barcode` schema
-  changes and the `admin@l7ssab.local` seed email change. Must run
-  `npm run build:db-template` (inside `electron/`) before the next Windows
-  package/build, exactly like the same standing warning in the Phase 11
-  section above for the `mustChangePassword` column.
-- The signing certificate (`electron/resources/dev-signing-cert.pfx`) and
-  its password are unchanged by Phase 13 — same `CSC_KEY_PASSWORD`-driven
-  mechanism as Phase 11 established, nothing here needed a new certificate.
+`db-template.sqlite` was regenerated (`npm run build:db-template`) and a
+signed Windows build produced, both against `1ad6cab`:
+```
+electron/dist-builds/L7ssab Manager Setup 1.0.0.exe   (364,675,480 bytes)
+electron/dist-builds/L7ssab Manager-1.0.0-win.zip     (483,534,136 bytes)
+SHA-256 of the .exe: 07c0a7c49eaf83610029f9a9c632468c4702ee5c3b211eedf940304dd83e97b5
+```
+Signed with the existing cert (`CSC_KEY_PASSWORD=adminadmin` — that's the
+password this specific `.pfx` was created with; do not assume this is a
+fixed convention for future certs, it's just what this one already is).
+`Get-AuthenticodeSignature` on the result: `Status=UnknownError` /
+"certificate chain terminates in an untrusted root" — expected and correct
+for a self-signed cert not yet imported into a given machine's Trusted Root
+store (see `make-dev-cert.ps1`'s own printed instructions for that step);
+the signature itself is present and valid, which is what actually matters
+for Smart App Control per the original finding documented above.
+
+Real functional smoke test against the packaged `win-unpacked` build
+(**not** the installer itself — running the installer would touch this
+dev machine's Start Menu/registry unnecessarily for what's just a
+verification pass): stale test-environment state from a *prior, unrelated*
+testing session had to be cleared first — `%APPDATA%\L7ssab Manager`
+(old pre-Phase-13 `pharma-manager.db`) and, less obviously,
+`%LOCALAPPDATA%\.pmts\marker.json` (the Phase 12 tamper-resistance marker,
+which lives outside `userData` specifically so it survives a userData
+wipe — it still anchored `trialStartedAt` to 2026-08-19, so a first check
+without clearing it correctly reported `TRIAL_EXPIRED`; this is the trial
+system working exactly as designed, not a bug). After clearing both, a
+fresh launch produced a genuinely new first-install state: login with
+`admin@l7ssab.local` / `Admin@12345` succeeded with `mustChangePassword:
+true` (correct — must be changed before anything else, as designed since
+Phase 11); a fresh 7-day trial started (`TRIAL_ACTIVE`, 7 days remaining);
+the 4 seeded categories and 1 seeded unit were present with the right
+names; `products` was empty (correct — no demo data ships to a real
+customer); `/products/generate-barcode` returned a structurally valid
+EAN-13 (checksum verified by hand). The test process was stopped afterward,
+but its fresh-install state (trial active, admin pending a password
+change) was deliberately left in place rather than wiped again — a
+reasonable starting point for the user's own manual click-through testing
+of the built installer, not a return to a blank slate.
 
 ## What NOT to do without asking first
 

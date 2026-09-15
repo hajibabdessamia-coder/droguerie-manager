@@ -56,22 +56,40 @@ at `Desktop/pharma-manager-BACKUP-2026-09-15` — `node_modules`/`.next`/
   (generate or scan/type one), scan-to-cart in the POS screen, and a
   label-printing page.
 
-## The one thing you MUST do before packaging a new build
+## Test build already done (2026-09-15, same day as Phase 13)
 
-`electron/resources/db-template.sqlite` (the database every fresh install
-starts from) **predates all of Phase 13** — it's still missing the
-`Category`/`Unit`/`barcode` columns and still seeds `admin@pharma.local`
-instead of `admin@l7ssab.local`. It does not regenerate itself; it's a
-gitignored build artifact. Before the next Windows package build:
+`db-template.sqlite` was regenerated and a signed Windows build produced
+the same day, both against `1ad6cab` — the "must do before packaging"
+warning below is satisfied for right now. Output:
+```
+electron/dist-builds/L7ssab Manager Setup 1.0.0.exe   (~348 MB, signed)
+electron/dist-builds/L7ssab Manager-1.0.0-win.zip     (~461 MB)
+```
+Verified via a real functional smoke test against the packaged backend
+(fresh login, `TRIAL_ACTIVE` 7-day trial, seeded categories/unit present,
+zero demo products, barcode generation working) — full details in
+`HANDOFF.md`'s "Final test build" note at the end of the Phase 13 section,
+including two pieces of **stale test-environment state from an unrelated
+prior session** that had to be cleared first for the test to mean anything
+(`%APPDATA%\L7ssab Manager` and, less obviously,
+`%LOCALAPPDATA%\.pmts\marker.json` — the Phase 12 trial marker that
+deliberately survives a userData wipe by design). If you relaunch
+`dist-builds\win-unpacked\L7ssab Manager.exe` yourself, it already has this
+fresh-install state (trial active, admin password-change pending) — no
+need to wipe anything again for normal manual testing.
+
+## The one thing you MUST do before packaging a *new* build (i.e. next time schema/seed changes)
+
+`electron/resources/db-template.sqlite` does **not** regenerate itself —
+it's a gitignored build artifact. Any time `schema.prisma` or
+`seed.production.ts` changes after this note and before you package again:
 ```bash
 cd electron
 npm run build:db-template
 ```
 This re-applies every migration to a fresh file and reseeds just the admin
-account + default store settings (`backend/prisma/seed.production.ts` — no
-demo data, that's intentional for real customer installs). Do this **every
-time** `schema.prisma` or `seed.production.ts` changes and you're about to
-package, not just this once.
+account + default store settings — no demo data, intentional for real
+customer installs.
 
 ## Signing / packaging, unchanged from before
 
