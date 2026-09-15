@@ -7,55 +7,66 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { fetchDashboardSummary } from '@/lib/dashboard';
-import { cn, formatCurrency, formatDateTime } from '@/lib/utils';
+import { cn, formatCurrency, formatDateTime, formatNumber } from '@/lib/utils';
+import { useLocale } from '@/i18n/locale-provider';
+import type { Locale, TranslationKey } from '@/i18n/types';
 import type { DashboardSummary } from '@/types';
 
-const STAT_CARDS: {
+interface StatCard {
   key: keyof Pick<
     DashboardSummary,
     'todayTransactionsCount' | 'profitToday' | 'totalInvoices' | 'totalProducts' | 'lowStockCount'
   >;
-  label: string;
+  labelKey: TranslationKey;
   icon: typeof Receipt;
   format: (value: number) => string;
   warnIfPositive?: boolean;
-}[] = [
-  { key: 'todayTransactionsCount', label: 'معاملات اليوم', icon: Receipt, format: (v) => v.toLocaleString('ar-MA') },
-  { key: 'profitToday', label: 'أرباح اليوم', icon: Wallet, format: formatCurrency },
-  { key: 'totalInvoices', label: 'عدد الفواتير', icon: FileText, format: (v) => v.toLocaleString('ar-MA') },
-  { key: 'totalProducts', label: 'عدد المنتجات', icon: Package, format: (v) => v.toLocaleString('ar-MA') },
-  {
-    key: 'lowStockCount',
-    label: 'منتجات قليلة المخزون',
-    icon: AlertTriangle,
-    format: (v) => v.toLocaleString('ar-MA'),
-    warnIfPositive: true,
-  },
-];
+}
+
+// تُبنى هنا (وليس كثابت خارج المكوّن كما كانت سابقاً) لأنها تحتاج اللغة الحالية عبر
+// useLocale()، وهي متاحة فقط داخل المكوّن — التكلفة زهيدة (5 عناصر) فلا داعي لـ useMemo
+function buildStatCards(locale: Locale): StatCard[] {
+  const count = (v: number) => formatNumber(v, locale);
+  return [
+    { key: 'todayTransactionsCount', labelKey: 'dashboard.stats.todayTransactions', icon: Receipt, format: count },
+    { key: 'profitToday', labelKey: 'dashboard.stats.profitToday', icon: Wallet, format: (v) => formatCurrency(v, locale) },
+    { key: 'totalInvoices', labelKey: 'dashboard.stats.totalInvoices', icon: FileText, format: count },
+    { key: 'totalProducts', labelKey: 'dashboard.stats.totalProducts', icon: Package, format: count },
+    {
+      key: 'lowStockCount',
+      labelKey: 'dashboard.stats.lowStockCount',
+      icon: AlertTriangle,
+      format: count,
+      warnIfPositive: true,
+    },
+  ];
+}
 
 export default function DashboardPage() {
+  const { t, locale } = useLocale();
   const { data, isLoading, isError } = useQuery({
     queryKey: ['dashboard-summary'],
     queryFn: fetchDashboardSummary,
     refetchInterval: 60_000,
   });
+  const statCards = buildStatCards(locale);
 
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-bold">لوحة التحكم</h1>
-        <p className="mt-1 text-sm text-muted-foreground">نظرة سريعة على نشاط المحل اليوم</p>
+        <h1 className="text-2xl font-bold">{t('dashboard.title')}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">{t('dashboard.subtitle')}</p>
       </div>
 
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
-        {STAT_CARDS.map(({ key, label, icon: Icon, format, warnIfPositive }) => {
+        {statCards.map(({ key, labelKey, icon: Icon, format, warnIfPositive }) => {
           const value = data?.[key];
           const warn = warnIfPositive && typeof value === 'number' && value > 0;
           return (
             <Card key={key}>
               <CardContent className="flex items-center justify-between p-5">
                 <div>
-                  <p className="text-sm text-muted-foreground">{label}</p>
+                  <p className="text-sm text-muted-foreground">{t(labelKey)}</p>
                   {isLoading || value === undefined ? (
                     <Skeleton className="mt-2 h-7 w-16" />
                   ) : (
@@ -76,18 +87,18 @@ export default function DashboardPage() {
         })}
       </div>
 
-      {isError && <p className="text-sm text-destructive">تعذّر تحميل بيانات لوحة التحكم.</p>}
+      {isError && <p className="text-sm text-destructive">{t('dashboard.loadError')}</p>}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base font-semibold text-foreground">منتجات قليلة المخزون</CardTitle>
+            <CardTitle className="text-base font-semibold text-foreground">{t('dashboard.lowStock.title')}</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-2">
             {isLoading &&
               Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
             {!isLoading && data?.lowStockProducts.length === 0 && (
-              <p className="text-sm text-muted-foreground">لا توجد منتجات قليلة المخزون حالياً.</p>
+              <p className="text-sm text-muted-foreground">{t('dashboard.lowStock.empty')}</p>
             )}
             {data?.lowStockProducts.map((p) => (
               <div
@@ -105,22 +116,24 @@ export default function DashboardPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base font-semibold text-foreground">آخر المبيعات</CardTitle>
+            <CardTitle className="text-base font-semibold text-foreground">{t('dashboard.recentSales.title')}</CardTitle>
           </CardHeader>
           <CardContent className="overflow-x-auto">
             {isLoading &&
               Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="mb-2 h-10 w-full" />)}
             {!isLoading && data?.recentSales.length === 0 && (
-              <p className="text-sm text-muted-foreground">لا توجد مبيعات بعد.</p>
+              <p className="text-sm text-muted-foreground">{t('dashboard.recentSales.empty')}</p>
             )}
             {data && data.recentSales.length > 0 && (
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-border text-right text-muted-foreground">
-                    <th className="py-2 font-medium">الفاتورة</th>
-                    <th className="py-2 font-medium">الزبون</th>
-                    <th className="py-2 font-medium">المجموع</th>
-                    <th className="py-2 font-medium">التاريخ</th>
+                  {/* text-start (وليس text-right) لتبقى محاذاة العناوين صحيحة تلقائياً
+                      في الاتجاهين: يمين في RTL (كما هو الحال حالياً)، يسار في LTR */}
+                  <tr className="border-b border-border text-start text-muted-foreground">
+                    <th className="py-2 font-medium">{t('dashboard.recentSales.columns.invoice')}</th>
+                    <th className="py-2 font-medium">{t('dashboard.recentSales.columns.customer')}</th>
+                    <th className="py-2 font-medium">{t('dashboard.recentSales.columns.total')}</th>
+                    <th className="py-2 font-medium">{t('dashboard.recentSales.columns.date')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -134,9 +147,11 @@ export default function DashboardPage() {
                           {sale.invoiceNumber}
                         </Link>
                       </td>
-                      <td className="py-2">{sale.customerName ?? 'زبون عابر'}</td>
-                      <td className="py-2">{formatCurrency(sale.total)}</td>
-                      <td className="py-2 text-muted-foreground">{formatDateTime(sale.createdAt)}</td>
+                      {/* sale.customerName بيانات زبون حقيقية عند وجودها — لا تُترجَم؛
+                          البديل الاحتياطي فقط (لا يوجد زبون مرتبط بالفاتورة) يُترجَم */}
+                      <td className="py-2">{sale.customerName ?? t('dashboard.recentSales.walkInCustomer')}</td>
+                      <td className="py-2">{formatCurrency(sale.total, locale)}</td>
+                      <td className="py-2 text-muted-foreground">{formatDateTime(sale.createdAt, locale)}</td>
                     </tr>
                   ))}
                 </tbody>

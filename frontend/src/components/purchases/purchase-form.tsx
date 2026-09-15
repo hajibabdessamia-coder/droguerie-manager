@@ -14,6 +14,7 @@ import { createPurchase } from '@/lib/purchases';
 import { fetchProducts } from '@/lib/products';
 import { fetchSuppliers } from '@/lib/suppliers';
 import { formatCurrency } from '@/lib/utils';
+import { useLocale } from '@/i18n/locale-provider';
 
 interface PurchaseLine {
   productId: string;
@@ -28,6 +29,7 @@ function emptyLine(): PurchaseLine {
 export function PurchaseForm() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { t, locale } = useLocale();
 
   const { data: suppliers } = useQuery({ queryKey: ['suppliers'], queryFn: () => fetchSuppliers() });
   const { data: products } = useQuery({ queryKey: ['products-all'], queryFn: () => fetchProducts() });
@@ -72,16 +74,16 @@ export function PurchaseForm() {
     },
     onError: (err) => {
       const message = isAxiosError(err) ? err.response?.data?.message : undefined;
-      setError(message ?? 'حدث خطأ أثناء الحفظ');
+      setError(message ?? t('common.genericSaveError'));
     },
   });
 
   function handleSubmit() {
     setError(null);
-    if (!supplierId) return setError('يجب اختيار المورد');
-    if (lines.length === 0) return setError('أضف منتجاً واحداً على الأقل');
+    if (!supplierId) return setError(t('purchases.validationSelectSupplier'));
+    if (lines.length === 0) return setError(t('purchases.validationAddLine'));
     if (lines.some((l) => !l.productId || !l.quantity || !l.purchasePrice)) {
-      return setError('أكمل بيانات كل الأسطر (المنتج، الكمية، سعر الشراء)');
+      return setError(t('purchases.validationCompleteLines'));
     }
     mutation.mutate();
   }
@@ -91,9 +93,9 @@ export function PurchaseForm() {
       <Card>
         <CardContent className="grid grid-cols-1 gap-4 p-5 md:grid-cols-2">
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="supplierId">المورد</Label>
+            <Label htmlFor="supplierId">{t('purchases.supplierLabel')}</Label>
             <Select id="supplierId" value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>
-              <option value="">اختر المورد</option>
+              <option value="">{t('purchases.selectSupplierPlaceholder')}</option>
               {suppliers?.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
@@ -102,7 +104,7 @@ export function PurchaseForm() {
             </Select>
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="invoiceRef">رقم فاتورة المورد (اختياري)</Label>
+            <Label htmlFor="invoiceRef">{t('purchases.invoiceRefOptionalLabel')}</Label>
             <Input id="invoiceRef" value={invoiceRef} onChange={(e) => setInvoiceRef(e.target.value)} />
           </div>
         </CardContent>
@@ -110,15 +112,15 @@ export function PurchaseForm() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base font-semibold text-foreground">المنتجات</CardTitle>
+          <CardTitle className="text-base font-semibold text-foreground">{t('common.productsSectionTitle')}</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           {lines.map((line, index) => (
             <div key={index} className="flex flex-wrap items-end gap-2 rounded-lg border border-border p-3">
               <div className="flex min-w-[200px] flex-1 flex-col gap-1.5">
-                <Label>المنتج</Label>
+                <Label>{t('common.product')}</Label>
                 <Select value={line.productId} onChange={(e) => updateLine(index, { productId: e.target.value })}>
-                  <option value="">اختر منتجاً</option>
+                  <option value="">{t('purchases.selectProductPlaceholder')}</option>
                   {products?.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.name}
@@ -127,7 +129,7 @@ export function PurchaseForm() {
                 </Select>
               </div>
               <div className="flex w-28 flex-col gap-1.5">
-                <Label>الكمية</Label>
+                <Label>{t('common.quantity')}</Label>
                 <Input
                   type="number"
                   min="1"
@@ -136,7 +138,7 @@ export function PurchaseForm() {
                 />
               </div>
               <div className="flex w-32 flex-col gap-1.5">
-                <Label>سعر الشراء</Label>
+                <Label>{t('common.purchasePrice')}</Label>
                 <Input
                   type="number"
                   min="0"
@@ -158,12 +160,12 @@ export function PurchaseForm() {
           ))}
           <Button type="button" variant="outline" onClick={addLine} className="self-start">
             <Plus className="h-4 w-4" />
-            إضافة منتج
+            {t('purchases.addLineButton')}
           </Button>
 
           <div className="flex justify-between border-t border-border pt-3 text-base font-bold">
-            <span>الإجمالي</span>
-            <span>{formatCurrency(total)}</span>
+            <span>{t('common.grandTotal')}</span>
+            <span>{formatCurrency(total, locale)}</span>
           </div>
         </CardContent>
       </Card>
@@ -172,10 +174,10 @@ export function PurchaseForm() {
 
       <div className="flex justify-end gap-3">
         <Button type="button" variant="outline" onClick={() => router.push('/purchases')}>
-          إلغاء
+          {t('common.cancel')}
         </Button>
         <Button type="button" disabled={mutation.isPending} onClick={handleSubmit}>
-          {mutation.isPending ? 'جارٍ الحفظ...' : 'حفظ فاتورة الشراء'}
+          {mutation.isPending ? t('common.saving') : t('purchases.saveButton')}
         </Button>
       </div>
     </div>

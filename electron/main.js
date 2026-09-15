@@ -6,7 +6,7 @@ const net = require('net');
 const http = require('http');
 const crypto = require('crypto');
 
-const APP_NAME = 'Pharma Manager';
+const APP_NAME = 'L7ssab Manager';
 app.setName(APP_NAME);
 
 // يمنع تشغيل أكثر من نسخة واحدة من التطبيق في آن واحد. ضروري هنا تحديداً: كل نسخة

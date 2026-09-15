@@ -9,14 +9,16 @@ import { fetchSale } from '@/lib/sales';
 import { fetchStoreSettings } from '@/lib/store-settings';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import { useRouteId } from '@/lib/use-route-id';
+import { useLocale } from '@/i18n/locale-provider';
 
 export default function ReceiptPage() {
   const id = useRouteId();
+  const { t, locale } = useLocale();
   const { data: sale, isLoading } = useQuery({ queryKey: ['sale', id], queryFn: () => fetchSale(id) });
   const { data: settings } = useQuery({ queryKey: ['store-settings'], queryFn: fetchStoreSettings });
 
   if (isLoading) return <Skeleton className="mx-auto h-96 w-full max-w-2xl" />;
-  if (!sale) return <p className="text-sm text-destructive">الفاتورة غير موجودة.</p>;
+  if (!sale) return <p className="text-sm text-destructive">{t('sales.notFound')}</p>;
 
   const isLegal = sale.invoiceType === 'LEGAL';
 
@@ -26,11 +28,11 @@ export default function ReceiptPage() {
 
       <div className="flex items-center justify-between print:hidden">
         <Link href="/pos" className={buttonVariants({ variant: 'outline' })}>
-          بيعة جديدة
+          {t('pos.newSaleLink')}
         </Link>
         <button type="button" onClick={() => window.print()} className={buttonVariants({})}>
           <Printer className="h-4 w-4" />
-          طباعة
+          {t('pos.printButton')}
         </button>
       </div>
 
@@ -47,15 +49,18 @@ export default function ReceiptPage() {
               {settings?.phone && <p className="text-sm text-gray-600">{settings.phone}</p>}
             </div>
             <div className="text-left text-sm">
-              <p className="text-lg font-bold">فاتورة رقم {sale.invoiceNumber}</p>
-              <p className="text-gray-600">{formatDateTime(sale.createdAt)}</p>
+              <p className="text-lg font-bold">
+                {t('pos.receiptInvoiceNumberPrefix')}
+                {sale.invoiceNumber}
+              </p>
+              <p className="text-gray-600">{formatDateTime(sale.createdAt, locale)}</p>
             </div>
           </div>
 
           <div className="mt-4 flex items-start justify-between text-sm">
             <p>
-              <span className="font-semibold">الزبون: </span>
-              {sale.customer?.name ?? 'زبون عابر'}
+              <span className="font-semibold">{t('common.customerLabel')}: </span>
+              {sale.customer?.name ?? t('common.walkInCustomer')}
             </p>
             <div className="space-y-0.5 text-left text-xs text-gray-600">
               {settings?.ifNumber && <p>IF: {settings.ifNumber}</p>}
@@ -68,10 +73,10 @@ export default function ReceiptPage() {
           <table className="mt-6 w-full text-sm">
             <thead>
               <tr className="border-b-2 border-gray-800 text-right">
-                <th className="py-2 font-semibold">المنتج</th>
-                <th className="py-2 font-semibold">الكمية</th>
-                <th className="py-2 font-semibold">السعر</th>
-                <th className="py-2 font-semibold">المجموع</th>
+                <th className="py-2 font-semibold">{t('common.product')}</th>
+                <th className="py-2 font-semibold">{t('common.quantity')}</th>
+                <th className="py-2 font-semibold">{t('sales.unitPriceColumn')}</th>
+                <th className="py-2 font-semibold">{t('common.total')}</th>
               </tr>
             </thead>
             <tbody>
@@ -79,8 +84,8 @@ export default function ReceiptPage() {
                 <tr key={item.id} className="border-b border-gray-200">
                   <td className="py-2">{item.product?.name ?? item.productId}</td>
                   <td className="py-2">{item.quantity}</td>
-                  <td className="py-2">{formatCurrency(item.unitPrice)}</td>
-                  <td className="py-2">{formatCurrency(item.total)}</td>
+                  <td className="py-2">{formatCurrency(item.unitPrice, locale)}</td>
+                  <td className="py-2">{formatCurrency(item.total, locale)}</td>
                 </tr>
               ))}
             </tbody>
@@ -89,28 +94,28 @@ export default function ReceiptPage() {
           <div className="mt-6 flex justify-end">
             <div className="w-64 space-y-1 text-sm">
               <div className="flex justify-between text-gray-600">
-                <span>المجموع الفرعي</span>
-                <span>{formatCurrency(sale.subtotal)}</span>
+                <span>{t('sales.subtotalLabel')}</span>
+                <span>{formatCurrency(sale.subtotal, locale)}</span>
               </div>
               <div className="flex justify-between text-gray-600">
-                <span>الخصم</span>
-                <span>{formatCurrency(sale.discount)}</span>
+                <span>{t('sales.discountLabel')}</span>
+                <span>{formatCurrency(sale.discount, locale)}</span>
               </div>
               <div className="flex justify-between text-gray-600">
                 <span>TVA ({Number(sale.taxRate)}%)</span>
-                <span>{formatCurrency(sale.taxAmount)}</span>
+                <span>{formatCurrency(sale.taxAmount, locale)}</span>
               </div>
               <div className="flex justify-between border-t border-gray-800 pt-1 text-base font-bold">
-                <span>الإجمالي</span>
-                <span>{formatCurrency(sale.total)}</span>
+                <span>{t('common.grandTotal')}</span>
+                <span>{formatCurrency(sale.total, locale)}</span>
               </div>
               <div className="flex justify-between text-gray-600">
-                <span>المدفوع</span>
-                <span>{formatCurrency(sale.amountPaid)}</span>
+                <span>{t('sales.paidLabel')}</span>
+                <span>{formatCurrency(sale.amountPaid, locale)}</span>
               </div>
               <div className="flex justify-between text-gray-600">
-                <span>الباقي</span>
-                <span>{formatCurrency(sale.changeDue)}</span>
+                <span>{t('sales.changeDueLabel')}</span>
+                <span>{formatCurrency(sale.changeDue, locale)}</span>
               </div>
             </div>
           </div>
@@ -123,31 +128,34 @@ export default function ReceiptPage() {
             {settings?.phone && <p>{settings.phone}</p>}
           </div>
           <div className="my-2 border-t border-dashed border-gray-500" />
-          <p>رقم: {sale.invoiceNumber}</p>
-          <p>{formatDateTime(sale.createdAt)}</p>
+          <p>
+            {t('pos.receiptTicketNumberPrefix')}
+            {sale.invoiceNumber}
+          </p>
+          <p>{formatDateTime(sale.createdAt, locale)}</p>
           <div className="my-2 border-t border-dashed border-gray-500" />
           {sale.items.map((item) => (
             <div key={item.id} className="flex justify-between gap-2">
               <span className="truncate">
                 {item.product?.name ?? item.productId} × {item.quantity}
               </span>
-              <span className="shrink-0">{formatCurrency(item.total)}</span>
+              <span className="shrink-0">{formatCurrency(item.total, locale)}</span>
             </div>
           ))}
           <div className="my-2 border-t border-dashed border-gray-500" />
           <div className="flex justify-between font-bold">
-            <span>الإجمالي</span>
-            <span>{formatCurrency(sale.total)}</span>
+            <span>{t('common.grandTotal')}</span>
+            <span>{formatCurrency(sale.total, locale)}</span>
           </div>
           <div className="flex justify-between">
-            <span>المدفوع</span>
-            <span>{formatCurrency(sale.amountPaid)}</span>
+            <span>{t('sales.paidLabel')}</span>
+            <span>{formatCurrency(sale.amountPaid, locale)}</span>
           </div>
           <div className="flex justify-between">
-            <span>الباقي</span>
-            <span>{formatCurrency(sale.changeDue)}</span>
+            <span>{t('sales.changeDueLabel')}</span>
+            <span>{formatCurrency(sale.changeDue, locale)}</span>
           </div>
-          <p className="mt-3 text-center">شكراً لتعاملكم معنا</p>
+          <p className="mt-3 text-center">{t('pos.receiptThankYou')}</p>
         </div>
       )}
     </div>

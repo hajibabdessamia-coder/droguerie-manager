@@ -13,12 +13,14 @@ import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { createManufacturer, fetchManufacturers } from '@/lib/manufacturers';
 import { createProduct, updateProduct, uploadProductImage, type ProductInput } from '@/lib/products';
-import { PRODUCT_GROUPS, PRODUCT_GROUP_LABELS } from '@/lib/product-groups';
+import { PRODUCT_GROUPS } from '@/lib/product-groups';
+import { useLocale } from '@/i18n/locale-provider';
 import type { Product, ProductGroup } from '@/types';
 
 export function ProductForm({ product }: { product?: Product }) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { t } = useLocale();
   const isEdit = Boolean(product);
 
   const { data: manufacturers } = useQuery({ queryKey: ['manufacturers'], queryFn: fetchManufacturers });
@@ -65,7 +67,7 @@ export function ProductForm({ product }: { product?: Product }) {
     },
     onError: (err) => {
       const message = isAxiosError(err) ? err.response?.data?.message : undefined;
-      setError(message ?? 'حدث خطأ أثناء الحفظ');
+      setError(message ?? t('productForm.genericError'));
     },
   });
 
@@ -77,7 +79,7 @@ export function ProductForm({ product }: { product?: Product }) {
   }
 
   async function handleAddManufacturer() {
-    const value = window.prompt('اسم الشركة المصنعة الجديدة؟');
+    const value = window.prompt(t('productForm.addManufacturerPrompt'));
     if (!value) return;
     const manufacturer = await createManufacturer(value);
     await queryClient.invalidateQueries({ queryKey: ['manufacturers'] });
@@ -109,34 +111,34 @@ export function ProductForm({ product }: { product?: Product }) {
                 onChange={handleImageChange}
               />
             </label>
-            <p className="text-sm text-muted-foreground">صورة المنتج (JPG, PNG, WEBP، حتى 5MB)</p>
+            <p className="text-sm text-muted-foreground">{t('productForm.imageHint')}</p>
           </div>
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="name">اسم المنتج</Label>
+              <Label htmlFor="name">{t('productForm.nameLabel')}</Label>
               <Input id="name" required value={name} onChange={(e) => setName(e.target.value)} />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="internalCode">الكود الداخلي</Label>
+              <Label htmlFor="internalCode">{t('productForm.internalCodeLabel')}</Label>
               <Input id="internalCode" required value={internalCode} onChange={(e) => setInternalCode(e.target.value)} />
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="group">فئة نقطة البيع</Label>
+              <Label htmlFor="group">{t('productForm.groupLabel')}</Label>
               <Select id="group" value={group} onChange={(e) => setGroup(e.target.value as ProductGroup)}>
                 {PRODUCT_GROUPS.map((g) => (
                   <option key={g} value={g}>
-                    {PRODUCT_GROUP_LABELS[g]}
+                    {t(`productGroups.${g}`)}
                   </option>
                 ))}
               </Select>
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="manufacturerId">الشركة المصنعة</Label>
+              <Label htmlFor="manufacturerId">{t('productForm.manufacturerLabel')}</Label>
               <div className="flex gap-2">
                 <Select id="manufacturerId" value={manufacturerId} onChange={(e) => setManufacturerId(e.target.value)}>
-                  <option value="">بدون شركة مصنعة</option>
+                  <option value="">{t('productForm.noManufacturer')}</option>
                   {manufacturers?.map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.name}
@@ -150,7 +152,7 @@ export function ProductForm({ product }: { product?: Product }) {
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="purchasePrice">سعر الشراء</Label>
+              <Label htmlFor="purchasePrice">{t('productForm.purchasePriceLabel')}</Label>
               <Input
                 id="purchasePrice"
                 type="number"
@@ -162,7 +164,7 @@ export function ProductForm({ product }: { product?: Product }) {
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="retailPrice">سعر البيع بالتقسيط</Label>
+              <Label htmlFor="retailPrice">{t('productForm.retailPriceLabel')}</Label>
               <Input
                 id="retailPrice"
                 type="number"
@@ -174,7 +176,7 @@ export function ProductForm({ product }: { product?: Product }) {
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="wholesalePrice">سعر البيع بالجملة</Label>
+              <Label htmlFor="wholesalePrice">{t('productForm.wholesalePriceLabel')}</Label>
               <Input
                 id="wholesalePrice"
                 type="number"
@@ -186,7 +188,7 @@ export function ProductForm({ product }: { product?: Product }) {
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="minStock">الحد الأدنى للمخزون</Label>
+              <Label htmlFor="minStock">{t('productForm.minStockLabel')}</Label>
               <Input
                 id="minStock"
                 type="number"
@@ -199,7 +201,7 @@ export function ProductForm({ product }: { product?: Product }) {
 
             {!isEdit && (
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="quantity">الكمية الأولية</Label>
+                <Label htmlFor="quantity">{t('productForm.initialQuantityLabel')}</Label>
                 <Input
                   id="quantity"
                   type="number"
@@ -213,7 +215,7 @@ export function ProductForm({ product }: { product?: Product }) {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="notes">ملاحظات</Label>
+            <Label htmlFor="notes">{t('productForm.notesLabel')}</Label>
             <Textarea id="notes" rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
           </div>
         </CardContent>
@@ -223,10 +225,10 @@ export function ProductForm({ product }: { product?: Product }) {
 
       <div className="flex justify-end gap-3">
         <Button type="button" variant="outline" onClick={() => router.push('/products')}>
-          إلغاء
+          {t('common.cancel')}
         </Button>
         <Button type="submit" disabled={mutation.isPending}>
-          {mutation.isPending ? 'جارٍ الحفظ...' : isEdit ? 'حفظ التعديلات' : 'إضافة المنتج'}
+          {mutation.isPending ? t('productForm.saving') : isEdit ? t('productForm.saveChanges') : t('productForm.addProduct')}
         </Button>
       </div>
     </form>

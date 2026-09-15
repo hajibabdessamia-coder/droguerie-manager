@@ -1,25 +1,36 @@
-// أيقونة التطبيق: مربع نحاسي بتدرج لوني ورمز صاعقة أبيض (يرمز للعقاقير الكهربائية)،
-// بدون أي مكتبة رسم خارجية — نفس فلسفة النسخة الأولى، لكن مع محاكاة فائقة العينات
-// (supersampling) لتنعيم الحواف، تدرج لوني بدل اللون المسطح، وحزمة ICO متعددة
-// الأحجام (16/32/48/256) يُعاد رسم كل حجم فيها من الصفر بدل تصغير صورة واحدة، حتى
-// تبقى الحواف حادة في شريط المهام الصغير أيضاً.
+// أيقونة التطبيق: مربع بتدرج لوني كحلي-إلى-أزرق مخضر (احترافي، مرتبط بمجال
+// المحاسبة/الحساب — "L7ssab")، يحمل شعار "L7" هندسي مكوّن من حرف L فضي/أبيض
+// ورقم 7 سيان/تيل متلاصقين في رمز واحد متماسك، بدون أي مكتبة رسم خارجية —
+// نفس فلسفة النسخة الأولى، مع محاكاة فائقة العينات (supersampling) لتنعيم
+// الحواف، تدرج لوني بدل اللون المسطح، وحزمة ICO متعددة الأحجام (16/32/48/256)
+// يُعاد رسم كل حجم فيها من الصفر بدل تصغير صورة واحدة، حتى تبقى الحواف حادة
+// في شريط المهام الصغير أيضاً.
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 
-const BG_TOP = [0xc1, 0x7a, 0x3f]; // نحاسي فاتح أعلى الأيقونة
-const BG_BOTTOM = [0x8a, 0x4a, 0x1c]; // نحاسي داكن أسفلها — يمنح إحساساً بالعمق
-const FG = [0xff, 0xff, 0xff];
+const BG_TOP = [0x1e, 0x3a, 0x5f]; // كحلي داكن أعلى الأيقونة
+const BG_BOTTOM = [0x0f, 0x76, 0x6e]; // أزرق مخضر (تيل) أسفلها — يمنح إحساساً بالعمق
+const L_COLOR = [0xf5, 0xf7, 0xfa]; // حرف L بلون أبيض/فضي
+const SEVEN_COLOR = [0x22, 0xd3, 0xee]; // رقم 7 بلون سيان/تيل فاتح
 const SUPERSAMPLE = 4;
 
-// نقاط صاعقة أنحف وأكثر توازناً من النسخة الأولى، مُقاسة إلى مربع [0,1]x[0,1]
-const BOLT_POINTS = [
-  [0.56, 0.06],
-  [0.32, 0.52],
-  [0.47, 0.52],
-  [0.42, 0.94],
-  [0.7, 0.44],
-  [0.53, 0.44],
+// حرف L: عمود رأسي + قاعدة أفقية، مُقاسان إلى مربع [0,1]x[0,1]
+const L_RECTS = [
+  [0.20, 0.18, 0.34, 0.80], // العمود الرأسي
+  [0.20, 0.66, 0.50, 0.80], // القاعدة الأفقية
+];
+
+// رقم 7: شريط علوي أفقي، مُقاس إلى مربع [0,1]x[0,1]
+const SEVEN_BAR_RECT = [0.44, 0.18, 0.82, 0.32];
+
+// الضلع المائل لرقم 7، ينزل من نهاية الشريط العلوي نحو أسفل يسار، بمحاذاة قاعدة
+// حرف L حتى يتشكل الرمزان كعلامة واحدة متماسكة
+const SEVEN_DIAGONAL_POINTS = [
+  [0.80, 0.32],
+  [0.68, 0.32],
+  [0.40, 0.82],
+  [0.52, 0.82],
 ];
 
 function pointInPolygon(nx, ny, pts) {
@@ -32,6 +43,10 @@ function pointInPolygon(nx, ny, pts) {
   return inside;
 }
 
+function inRect(nx, ny, [x0, y0, x1, y1]) {
+  return nx >= x0 && nx <= x1 && ny >= y0 && ny <= y1;
+}
+
 function roundedMask(x, y, s, radius) {
   const cx = Math.min(Math.max(x, radius), s - radius);
   const cy = Math.min(Math.max(y, radius), s - radius);
@@ -42,6 +57,16 @@ function roundedMask(x, y, s, radius) {
 
 function lerp(a, b, t) {
   return a + (b - a) * t;
+}
+
+// يحدد لون نقطة معطاة (بإحداثيات مُطبَّعة 0..1) حسب الطبقات، من الأعلى أولوية للأسفل
+function colorAt(nx, ny) {
+  for (const rect of L_RECTS) {
+    if (inRect(nx, ny, rect)) return L_COLOR;
+  }
+  if (inRect(nx, ny, SEVEN_BAR_RECT)) return SEVEN_COLOR;
+  if (pointInPolygon(nx, ny, SEVEN_DIAGONAL_POINTS)) return SEVEN_COLOR;
+  return null; // خلفية متدرجة
 }
 
 // يرسم حجماً واحداً بمعاينة فائقة العينات: لكل بكسل ناتج، يفحص شبكة SUPERSAMPLE×SUPERSAMPLE
@@ -69,10 +94,11 @@ function renderIconRGBA(size) {
 
           const ny = py / size;
           const nx = px / size;
-          if (pointInPolygon(nx, ny, BOLT_POINTS)) {
-            r += FG[0];
-            g += FG[1];
-            b += FG[2];
+          const fg = colorAt(nx, ny);
+          if (fg) {
+            r += fg[0];
+            g += fg[1];
+            b += fg[2];
           } else {
             r += lerp(BG_TOP[0], BG_BOTTOM[0], ny);
             g += lerp(BG_TOP[1], BG_BOTTOM[1], ny);

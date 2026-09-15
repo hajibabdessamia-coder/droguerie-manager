@@ -10,11 +10,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { createCustomer, updateCustomer, type CustomerInput } from '@/lib/customers';
+import { useLocale } from '@/i18n/locale-provider';
 import type { Customer, CustomerType } from '@/types';
 
 export function CustomerForm({ customer }: { customer?: Customer }) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { t } = useLocale();
   const isEdit = Boolean(customer);
 
   const [name, setName] = useState(customer?.name ?? '');
@@ -39,7 +41,7 @@ export function CustomerForm({ customer }: { customer?: Customer }) {
     },
     onError: (err) => {
       const message = isAxiosError(err) ? err.response?.data?.message : undefined;
-      setError(message ?? 'حدث خطأ أثناء الحفظ');
+      setError(message ?? t('common.genericSaveError'));
     },
   });
 
@@ -54,22 +56,22 @@ export function CustomerForm({ customer }: { customer?: Customer }) {
       <Card>
         <CardContent className="grid grid-cols-1 gap-4 p-5 md:grid-cols-2">
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="name">الاسم</Label>
+            <Label htmlFor="name">{t('common.name')}</Label>
             <Input id="name" required value={name} onChange={(e) => setName(e.target.value)} />
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="type">النوع</Label>
+            <Label htmlFor="type">{t('customers.typeLabel')}</Label>
             <Select id="type" value={type} onChange={(e) => setType(e.target.value as CustomerType)}>
-              <option value="RETAIL">تقسيط</option>
-              <option value="WHOLESALE">جملة</option>
+              <option value="RETAIL">{t('customers.type.RETAIL')}</option>
+              <option value="WHOLESALE">{t('customers.type.WHOLESALE')}</option>
             </Select>
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="phone">الهاتف</Label>
+            <Label htmlFor="phone">{t('common.phone')}</Label>
             <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="address">العنوان</Label>
+            <Label htmlFor="address">{t('common.address')}</Label>
             <Input id="address" value={address} onChange={(e) => setAddress(e.target.value)} />
           </div>
         </CardContent>
@@ -79,10 +81,10 @@ export function CustomerForm({ customer }: { customer?: Customer }) {
 
       <div className="flex justify-end gap-3">
         <Button type="button" variant="outline" onClick={() => router.push('/customers')}>
-          إلغاء
+          {t('common.cancel')}
         </Button>
         <Button type="submit" disabled={mutation.isPending}>
-          {mutation.isPending ? 'جارٍ الحفظ...' : isEdit ? 'حفظ التعديلات' : 'إضافة الزبون'}
+          {mutation.isPending ? t('common.saving') : isEdit ? t('common.saveChanges') : t('customers.addSubmit')}
         </Button>
       </div>
     </form>

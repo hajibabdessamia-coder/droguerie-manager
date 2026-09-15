@@ -23,8 +23,8 @@ async function bootstrap() {
   app.useGlobalFilters(new PrismaExceptionFilter());
 
   const config = new DocumentBuilder()
-    .setTitle('Pharma Manager API')
-    .setDescription('واجهة برمجية لإدارة محل بيع العقاقير الكهربائية بالجملة والتقسيط')
+    .setTitle('نظام إدارة العقاقير الكهربائية API')
+    .setDescription('واجهة برمجية لإدارة العقاقير الكهربائية بالجملة والتقسيط')
     .setVersion('1.0')
     .addBearerAuth()
     .build();

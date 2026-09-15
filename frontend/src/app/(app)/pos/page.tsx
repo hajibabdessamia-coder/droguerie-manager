@@ -15,10 +15,11 @@ import { useDebouncedValue } from '@/hooks/use-debounce';
 import { authorizeOverride } from '@/lib/auth';
 import { fetchCustomers } from '@/lib/customers';
 import { fetchProducts } from '@/lib/products';
-import { PRODUCT_GROUPS, PRODUCT_GROUP_LABELS } from '@/lib/product-groups';
+import { PRODUCT_GROUPS } from '@/lib/product-groups';
 import { createSale } from '@/lib/sales';
 import { fetchStoreSettings } from '@/lib/store-settings';
 import { cn, formatCurrency } from '@/lib/utils';
+import { useLocale } from '@/i18n/locale-provider';
 import type { InvoiceType, PaymentMethod, PriceType, Product, ProductGroup } from '@/types';
 
 interface CartLine {
@@ -42,6 +43,7 @@ const OVERRIDE_TTL_MS = 5 * 60 * 1000;
 export default function PosPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { t, locale } = useLocale();
 
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search, 300);
@@ -142,7 +144,7 @@ export default function PosPage() {
     },
     onError: (err) => {
       const message = isAxiosError(err) ? err.response?.data?.message : undefined;
-      setOverrideError(message ?? 'فشل التفويض');
+      setOverrideError(message ?? t('pos.overrideAuthFailed'));
     },
   });
 
@@ -170,15 +172,15 @@ export default function PosPage() {
     },
     onError: (err) => {
       const message = isAxiosError(err) ? err.response?.data?.message : undefined;
-      setError(message ?? 'حدث خطأ أثناء إتمام البيع');
+      setError(message ?? t('pos.genericSaleError'));
     },
   });
 
   function handleSubmit() {
     setError(null);
-    if (lines.length === 0) return setError('السلة فارغة');
-    if (paymentMethod === 'CREDIT' && !customerId) return setError('يجب اختيار زبون للبيع بالدين');
-    if (hasCustomLine && !overrideValid) return setError('يتطلب السعر المخصص تفويض المدير أولاً');
+    if (lines.length === 0) return setError(t('pos.cartEmpty'));
+    if (paymentMethod === 'CREDIT' && !customerId) return setError(t('pos.creditRequiresCustomer'));
+    if (hasCustomLine && !overrideValid) return setError(t('pos.customPriceAuthRequired'));
     saleMutation.mutate();
   }
 
@@ -187,7 +189,7 @@ export default function PosPage() {
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
       <div className="flex flex-col gap-4 lg:col-span-2">
-        <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث عن منتج بالاسم..." />
+        <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('pos.searchPlaceholder')} />
 
         <div className="flex flex-wrap gap-2">
           {PRODUCT_GROUPS.map((g) => (
@@ -197,7 +199,7 @@ export default function PosPage() {
               variant={activeGroup === g ? 'default' : 'outline'}
               onClick={() => setActiveGroup(g)}
             >
-              {PRODUCT_GROUP_LABELS[g]}
+              {t(`productGroups.${g}`)}
             </Button>
           ))}
         </div>
@@ -218,25 +220,25 @@ export default function PosPage() {
                   <img src={p.imageUrl} alt={p.name} className="h-16 w-full rounded-lg object-cover" />
                 ) : (
                   <div className="flex h-16 w-full items-center justify-center rounded-lg bg-muted text-xs text-muted-foreground">
-                    لا صورة
+                    {t('products.noImage')}
                   </div>
                 )}
                 <div className="flex w-full items-center gap-1.5">
                   <span
                     className={cn('h-2.5 w-2.5 shrink-0 rounded-full', low ? 'bg-destructive' : 'bg-green-500')}
-                    title={low ? 'المخزون منخفض' : 'المخزون جيد'}
+                    title={low ? t('pos.lowStockTooltip') : t('pos.goodStockTooltip')}
                   />
                   <p className="line-clamp-2 text-sm font-medium">{p.name}</p>
                 </div>
                 <div className="flex w-full items-center justify-between">
-                  <span className="text-sm font-semibold text-primary">{formatCurrency(p.retailPrice)}</span>
+                  <span className="text-sm font-semibold text-primary">{formatCurrency(p.retailPrice, locale)}</span>
                   <Badge variant={low ? 'destructive' : 'secondary'}>{p.quantity}</Badge>
                 </div>
               </button>
             );
           })}
           {groupProducts?.length === 0 && (
-            <p className="col-span-full py-10 text-center text-sm text-muted-foreground">لا توجد منتجات مطابقة.</p>
+            <p className="col-span-full py-10 text-center text-sm text-muted-foreground">{t('products.emptyState')}</p>
           )}
         </div>
       </div>
@@ -244,26 +246,26 @@ export default function PosPage() {
       <div className="flex flex-col gap-4">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base font-semibold text-foreground">السلة</CardTitle>
+            <CardTitle className="text-base font-semibold text-foreground">{t('pos.cartTitle')}</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
             <Select value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
-              <option value="">زبون عابر</option>
+              <option value="">{t('common.walkInCustomer')}</option>
               {customers?.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.name} ({c.type === 'WHOLESALE' ? 'جملة' : 'تقسيط'})
+                  {c.name} ({c.type === 'WHOLESALE' ? t('customers.type.WHOLESALE') : t('customers.type.RETAIL')})
                 </option>
               ))}
             </Select>
 
             <div className="flex max-h-64 flex-col gap-2 overflow-y-auto">
-              {lines.length === 0 && <p className="py-6 text-center text-sm text-muted-foreground">السلة فارغة</p>}
+              {lines.length === 0 && <p className="py-6 text-center text-sm text-muted-foreground">{t('pos.cartEmpty')}</p>}
               {lines.map((line) => (
                 <div key={line.productId} className="flex flex-col gap-2 rounded-lg border border-border p-2">
                   <div className="flex items-center gap-2">
                     <p className="min-w-0 flex-1 truncate text-sm font-medium">{line.name}</p>
                     <div className="w-16 shrink-0 text-left text-sm font-medium">
-                      {formatCurrency(resolveUnitPrice(line) * line.quantity)}
+                      {formatCurrency(resolveUnitPrice(line) * line.quantity, locale)}
                     </div>
                     <Button
                       type="button"
@@ -282,9 +284,9 @@ export default function PosPage() {
                         onChange={(e) => updateLine(line.productId, { priceType: e.target.value as PriceType })}
                         className="h-8 w-24 text-xs"
                       >
-                        <option value="RETAIL">تقسيط</option>
-                        <option value="WHOLESALE">جملة</option>
-                        <option value="CUSTOM">مخصص</option>
+                        <option value="RETAIL">{t('pos.priceType.RETAIL')}</option>
+                        <option value="WHOLESALE">{t('pos.priceType.WHOLESALE')}</option>
+                        <option value="CUSTOM">{t('pos.priceType.CUSTOM')}</option>
                       </Select>
                       {line.priceType === 'CUSTOM' && (
                         <Input
@@ -294,7 +296,7 @@ export default function PosPage() {
                           className="h-8 w-20 text-xs"
                           value={line.customPrice ?? ''}
                           onChange={(e) => updateLine(line.productId, { customPrice: Number(e.target.value) })}
-                          placeholder="السعر"
+                          placeholder={t('pos.customPricePlaceholder')}
                         />
                       )}
                     </div>
@@ -328,18 +330,18 @@ export default function PosPage() {
               <div className="flex flex-col gap-2 rounded-lg border border-dashed border-destructive/50 bg-destructive/5 p-3">
                 <p className="flex items-center gap-1.5 text-sm font-medium text-destructive">
                   <ShieldCheck className="h-4 w-4" />
-                  سعر مخصص يتطلب تفويض المدير
+                  {t('pos.customPriceAuthRequired')}
                 </p>
                 <Input
                   type="email"
-                  placeholder="بريد المدير"
+                  placeholder={t('pos.managerEmailPlaceholder')}
                   value={overrideEmail}
                   onChange={(e) => setOverrideEmail(e.target.value)}
                   className="h-8 text-xs"
                 />
                 <Input
                   type="password"
-                  placeholder="كلمة المرور"
+                  placeholder={t('login.passwordLabel')}
                   value={overridePassword}
                   onChange={(e) => setOverridePassword(e.target.value)}
                   className="h-8 text-xs"
@@ -351,46 +353,46 @@ export default function PosPage() {
                   disabled={!overrideEmail || !overridePassword || overrideMutation.isPending}
                   onClick={() => overrideMutation.mutate()}
                 >
-                  تفويض
+                  {t('pos.authorizeButton')}
                 </Button>
               </div>
             )}
             {hasCustomLine && overrideValid && (
               <p className="flex items-center gap-1.5 text-sm text-primary">
                 <ShieldCheck className="h-4 w-4" />
-                تم تفويض المدير لهذا البيع
+                {t('pos.managerAuthorized')}
               </p>
             )}
 
             <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="invoiceType">نوع الفاتورة</Label>
+                <Label htmlFor="invoiceType">{t('sales.invoiceTypeLabel')}</Label>
                 <Select id="invoiceType" value={invoiceType} onChange={(e) => setInvoiceType(e.target.value as InvoiceType)}>
-                  <option value="TICKET">ورقة حساب</option>
-                  <option value="LEGAL">فاتورة قانونية</option>
+                  <option value="TICKET">{t('sales.invoiceType.TICKET')}</option>
+                  <option value="LEGAL">{t('sales.invoiceType.LEGAL')}</option>
                 </Select>
               </div>
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="paymentMethod">طريقة الدفع</Label>
+                <Label htmlFor="paymentMethod">{t('sales.paymentMethodLabel')}</Label>
                 <Select
                   id="paymentMethod"
                   value={paymentMethod}
                   onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
                 >
-                  <option value="CASH">نقدي</option>
-                  <option value="CREDIT">على الحساب</option>
+                  <option value="CASH">{t('sales.paymentMethod.CASH')}</option>
+                  <option value="CREDIT">{t('sales.paymentMethod.CREDIT')}</option>
                 </Select>
               </div>
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="discount">الخصم</Label>
+                <Label htmlFor="discount">{t('sales.discountLabel')}</Label>
                 <Input id="discount" type="number" min="0" step="0.01" value={discount} onChange={(e) => setDiscount(e.target.value)} />
               </div>
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="taxRate">الضريبة %</Label>
+                <Label htmlFor="taxRate">{t('sales.taxRateFormLabel')}</Label>
                 <Input id="taxRate" type="number" min="0" step="0.01" value={taxRate} onChange={(e) => setTaxRate(e.target.value)} />
               </div>
               <div className="col-span-2 flex flex-col gap-1.5">
-                <Label htmlFor="amountPaid">المبلغ المدفوع</Label>
+                <Label htmlFor="amountPaid">{t('sales.amountPaidFormLabel')}</Label>
                 <div className="flex gap-2">
                   <Input
                     id="amountPaid"
@@ -401,7 +403,7 @@ export default function PosPage() {
                     onChange={(e) => setAmountPaid(e.target.value)}
                   />
                   <Button type="button" variant="outline" onClick={() => setAmountPaid(total.toFixed(2))}>
-                    بالضبط
+                    {t('pos.exactAmountButton')}
                   </Button>
                 </div>
               </div>
@@ -409,20 +411,20 @@ export default function PosPage() {
 
             <div className="flex flex-col gap-1 border-t border-border pt-3 text-sm">
               <div className="flex justify-between text-muted-foreground">
-                <span>المجموع الفرعي</span>
-                <span>{formatCurrency(subtotal)}</span>
+                <span>{t('sales.subtotalLabel')}</span>
+                <span>{formatCurrency(subtotal, locale)}</span>
               </div>
               <div className="flex justify-between text-muted-foreground">
-                <span>الضريبة</span>
-                <span>{formatCurrency(taxAmount)}</span>
+                <span>{t('sales.taxLabel')}</span>
+                <span>{formatCurrency(taxAmount, locale)}</span>
               </div>
               <div className="flex justify-between text-base font-bold">
-                <span>الإجمالي</span>
-                <span>{formatCurrency(total)}</span>
+                <span>{t('common.grandTotal')}</span>
+                <span>{formatCurrency(total, locale)}</span>
               </div>
               <div className="flex justify-between text-muted-foreground">
-                <span>الباقي</span>
-                <span>{formatCurrency(changeDue)}</span>
+                <span>{t('sales.changeDueLabel')}</span>
+                <span>{formatCurrency(changeDue, locale)}</span>
               </div>
             </div>
 
@@ -435,7 +437,7 @@ export default function PosPage() {
               onClick={handleSubmit}
               className={cn('mt-1')}
             >
-              {saleMutation.isPending ? 'جارٍ إتمام البيع...' : 'إتمام البيع'}
+              {saleMutation.isPending ? t('pos.completeSaleLoading') : t('pos.completeSaleButton')}
             </Button>
           </CardContent>
         </Card>
