@@ -153,6 +153,9 @@ export const ar = {
     imageHint: 'صورة المنتج (JPG, PNG, WEBP، حتى 5MB)',
     nameLabel: 'اسم المنتج',
     internalCodeLabel: 'الكود الداخلي',
+    barcodeLabel: 'الباركود',
+    barcodePlaceholder: 'امسح بالقارئ أو أدخل يدوياً، أو اتركه واضغط "توليد"',
+    generateBarcodeButton: 'توليد',
     categoryLabel: 'الفئة',
     noCategory: 'بدون فئة',
     addCategoryPrompt: 'اسم الفئة الجديدة؟',
@@ -172,6 +175,12 @@ export const ar = {
     saving: 'جارٍ الحفظ...',
     saveChanges: 'حفظ التعديلات',
     addProduct: 'إضافة المنتج',
+  },
+  barcodeLabels: {
+    pageTitle: 'طباعة ملصقات الباركود',
+    subtitle: 'اختر المنتجات وعدد الملصقات لكل منتج، ثم اطبع',
+    copiesColumn: 'عدد الملصقات',
+    printButton: 'طباعة',
   },
   stockAdjustment: {
     title: 'تعديل المخزون يدوياً',

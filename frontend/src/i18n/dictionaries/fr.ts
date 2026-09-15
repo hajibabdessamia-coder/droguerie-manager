@@ -145,6 +145,9 @@ export const fr: Dictionary = {
     imageHint: "Image du produit (JPG, PNG, WEBP, jusqu'à 5 Mo)",
     nameLabel: 'Nom du produit',
     internalCodeLabel: 'Code interne',
+    barcodeLabel: 'Code-barres',
+    barcodePlaceholder: 'Scannez avec le lecteur ou saisissez, ou laissez vide et cliquez sur « Générer »',
+    generateBarcodeButton: 'Générer',
     categoryLabel: 'Catégorie',
     noCategory: 'Sans catégorie',
     addCategoryPrompt: 'Nom de la nouvelle catégorie ?',
@@ -164,6 +167,12 @@ export const fr: Dictionary = {
     saving: 'Enregistrement...',
     saveChanges: 'Enregistrer les modifications',
     addProduct: 'Ajouter le produit',
+  },
+  barcodeLabels: {
+    pageTitle: 'Imprimer des étiquettes code-barres',
+    subtitle: 'Choisissez les produits et le nombre d’étiquettes par produit, puis imprimez',
+    copiesColumn: "Nombre d'étiquettes",
+    printButton: 'Imprimer',
   },
   stockAdjustment: {
     title: 'Ajustement manuel du stock',

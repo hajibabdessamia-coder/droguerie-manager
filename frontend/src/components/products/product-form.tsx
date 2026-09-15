@@ -4,17 +4,18 @@ import { useRouter } from 'next/navigation';
 import { useState, type ChangeEvent, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
-import { ImagePlus, Plus } from 'lucide-react';
+import { ImagePlus, Plus, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { BarcodeSvg } from '@/components/products/barcode-svg';
 import { createManufacturer, fetchManufacturers } from '@/lib/manufacturers';
 import { createCategory, fetchCategories } from '@/lib/categories';
 import { createUnit, fetchUnits } from '@/lib/units';
-import { createProduct, updateProduct, uploadProductImage, type ProductInput } from '@/lib/products';
+import { createProduct, generateBarcode, updateProduct, uploadProductImage, type ProductInput } from '@/lib/products';
 import { useLocale } from '@/i18n/locale-provider';
 import type { Product } from '@/types';
 
@@ -30,6 +31,8 @@ export function ProductForm({ product }: { product?: Product }) {
 
   const [name, setName] = useState(product?.name ?? '');
   const [internalCode, setInternalCode] = useState(product?.internalCode ?? '');
+  const [barcode, setBarcode] = useState(product?.barcode ?? '');
+  const [generatingBarcode, setGeneratingBarcode] = useState(false);
   const [categoryId, setCategoryId] = useState(product?.categoryId ?? '');
   const [unitId, setUnitId] = useState(product?.unitId ?? '');
   const [manufacturerId, setManufacturerId] = useState(product?.manufacturerId ?? '');
@@ -52,6 +55,7 @@ export function ProductForm({ product }: { product?: Product }) {
       const input: ProductInput = {
         name,
         internalCode,
+        barcode: barcode || undefined,
         categoryId: categoryId || undefined,
         unitId: unitId || undefined,
         manufacturerId: manufacturerId || undefined,
@@ -81,6 +85,15 @@ export function ProductForm({ product }: { product?: Product }) {
     if (!file) return;
     setImageFile(file);
     setImagePreview(URL.createObjectURL(file));
+  }
+
+  async function handleGenerateBarcode() {
+    setGeneratingBarcode(true);
+    try {
+      setBarcode(await generateBarcode());
+    } finally {
+      setGeneratingBarcode(false);
+    }
   }
 
   async function handleAddManufacturer() {
@@ -143,6 +156,27 @@ export function ProductForm({ product }: { product?: Product }) {
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="internalCode">{t('productForm.internalCodeLabel')}</Label>
               <Input id="internalCode" required value={internalCode} onChange={(e) => setInternalCode(e.target.value)} />
+            </div>
+
+            <div className="flex flex-col gap-1.5 md:col-span-2">
+              <Label htmlFor="barcode">{t('productForm.barcodeLabel')}</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="barcode"
+                  value={barcode}
+                  onChange={(e) => setBarcode(e.target.value)}
+                  placeholder={t('productForm.barcodePlaceholder')}
+                />
+                <Button type="button" variant="outline" onClick={handleGenerateBarcode} disabled={generatingBarcode}>
+                  <RefreshCw className={generatingBarcode ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
+                  {t('productForm.generateBarcodeButton')}
+                </Button>
+              </div>
+              {barcode && (
+                <div className="mt-1 w-fit rounded-lg border border-border bg-white p-2">
+                  <BarcodeSvg value={barcode} />
+                </div>
+              )}
             </div>
 
             <div className="flex flex-col gap-1.5">

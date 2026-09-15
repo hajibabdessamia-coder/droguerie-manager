@@ -5,6 +5,7 @@ import { AdjustStockDto } from './dto/adjust-stock.dto';
 import { CreateProductDto } from './dto/create-product.dto';
 import { QueryProductDto } from './dto/query-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
+import { generateEan13Candidate } from './barcode.util';
 
 @Injectable()
 export class ProductsService {
@@ -23,6 +24,7 @@ export class ProductsService {
         OR: [
           { name: { contains: query.search } },
           { internalCode: { contains: query.search } },
+          { barcode: { contains: query.search } },
         ],
       }),
     };
@@ -77,5 +79,19 @@ export class ProductsService {
       orderBy: { name: 'asc' },
     });
     return products.filter((p) => p.quantity <= p.minStock);
+  }
+
+  // يولّد باركود EAN-13 عشوائياً (ضمن نطاق الاستخدام الداخلي المحجوز) ويتحقق من عدم
+  // تصادمه مع باركود موجود مسبقاً قبل إرجاعه — احتمال التصادم ضئيل جداً (10 خانات
+  // عشوائية) لكن التحقق يبقيه مضموناً 100% بدل الاعتماد على الاحتمال وحده
+  async generateUniqueBarcode(): Promise<{ barcode: string }> {
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const candidate = generateEan13Candidate();
+      const existing = await this.prisma.product.findUnique({ where: { barcode: candidate } });
+      if (!existing) return { barcode: candidate };
+    }
+    // احتمال شبه مستحيل عملياً (20 محاولة متتالية بلا نجاح) — رغم ذلك يُعاد آخر قيمة
+    // مولَّدة كي لا تفشل العملية بالكامل؛ فحص @unique في قاعدة البيانات يبقى خط الدفاع الأخير
+    return { barcode: generateEan13Candidate() };
   }
 }

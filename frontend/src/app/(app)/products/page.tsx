@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { AlertTriangle, Barcode, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -63,12 +63,18 @@ export default function ProductsPage() {
             {products ? `${products.length} ${t('products.countSuffix')}` : '...'}
           </p>
         </div>
-        {isAdmin && (
-          <Link href="/products/new" className={buttonVariants({ size: 'default' })}>
-            <Plus className="h-4 w-4" />
-            {t('products.addProduct')}
+        <div className="flex items-center gap-2">
+          <Link href="/products/barcode-labels" className={buttonVariants({ variant: 'outline', size: 'default' })}>
+            <Barcode className="h-4 w-4" />
+            {t('barcodeLabels.pageTitle')}
           </Link>
-        )}
+          {isAdmin && (
+            <Link href="/products/new" className={buttonVariants({ size: 'default' })}>
+              <Plus className="h-4 w-4" />
+              {t('products.addProduct')}
+            </Link>
+          )}
+        </div>
       </div>
 
       {deleteMutation.isError && <p className="text-sm text-destructive">{t('products.deleteError')}</p>}

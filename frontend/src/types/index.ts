@@ -28,6 +28,7 @@ export interface Product {
   name: string;
   imageUrl?: string | null;
   internalCode: string;
+  barcode?: string | null;
   categoryId?: string | null;
   category?: Category | null;
   unitId?: string | null;

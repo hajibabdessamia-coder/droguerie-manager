@@ -21,6 +21,14 @@ export class ProductsController {
     return this.service.lowStock();
   }
 
+  // يجب أن يسبق ':id' في الترتيب (كما هو الحال مع 'low-stock' أعلاه) وإلا التقطه
+  // NestJS كقيمة لـ :id بالخطأ
+  @Roles(Role.ADMIN)
+  @Get('generate-barcode')
+  generateBarcode() {
+    return this.service.generateUniqueBarcode();
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.service.findOne(id);

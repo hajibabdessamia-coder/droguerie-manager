@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type KeyboardEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
 import { Minus, Plus, ShieldCheck, Trash2 } from 'lucide-react';
@@ -187,12 +187,35 @@ export default function PosPage() {
     saleMutation.mutate();
   }
 
+  // قارئ الباركود يعمل كلوحة مفاتيح: يكتب الرمز بسرعة ثم يُرسل Enter. نطلب البيانات
+  // مباشرة هنا (بدل الاعتماد على قائمة "products" المحمَّلة عبر debouncedSearch) لأن
+  // الطلب المؤجَّل (300ms) قد لا يكون واكب آخر ما كُتب بعد عند وصول Enter — التطابق هنا
+  // تام (=== وليس "يحتوي") حتى لا يُضاف منتج خطأ من نتيجة جزئية بالصدفة
+  async function handleSearchKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const code = search.trim();
+    if (!code) return;
+    const results = await fetchProducts({ search: code });
+    const exact = results.find((p) => p.barcode === code || p.internalCode === code);
+    if (exact) {
+      addProductToCart(exact);
+      setSearch('');
+    }
+  }
+
   const groupProducts = activeCategoryId ? products?.filter((p) => p.categoryId === activeCategoryId) : products;
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
       <div className="flex flex-col gap-4 lg:col-span-2">
-        <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('pos.searchPlaceholder')} />
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          onKeyDown={handleSearchKeyDown}
+          placeholder={t('pos.searchPlaceholder')}
+          autoFocus
+        />
 
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant={activeCategoryId === null ? 'default' : 'outline'} onClick={() => setActiveCategoryId(null)}>

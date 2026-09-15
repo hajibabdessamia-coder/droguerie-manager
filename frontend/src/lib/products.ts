@@ -29,6 +29,7 @@ export interface ProductInput {
   name: string;
   imageUrl?: string;
   internalCode: string;
+  barcode?: string;
   categoryId?: string;
   unitId?: string;
   manufacturerId?: string;
@@ -57,6 +58,11 @@ export async function deleteProduct(id: string): Promise<void> {
 export async function adjustProductStock(id: string, delta: number, reason?: string): Promise<Product> {
   const { data } = await apiClient.patch<Product>(`/products/${id}/stock`, { delta, reason });
   return data;
+}
+
+export async function generateBarcode(): Promise<string> {
+  const { data } = await apiClient.get<{ barcode: string }>('/products/generate-barcode');
+  return data.barcode;
 }
 
 export async function uploadProductImage(file: File): Promise<string> {

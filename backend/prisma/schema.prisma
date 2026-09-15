@@ -90,6 +90,7 @@ model Product {
   name             String
   imageUrl         String?
   internalCode     String    @unique
+  barcode          String?   @unique // EAN-13 (13 رقماً) — راجع products/barcode.util.ts للتوليد والتحقق
   categoryId       String?
   category         Category?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   unitId           String?
