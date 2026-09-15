@@ -101,7 +101,7 @@ describe('License access guard wiring (e2e)', () => {
     it('still blocks /auth/login via LicenseGuard (no JWT can ever be obtained)', async () => {
       const res = await request(app.getHttpServer())
         .post('/api/auth/login')
-        .send({ email: 'admin@pharma.local', password: 'Admin@12345' })
+        .send({ email: 'admin@l7ssab.local', password: 'Admin@12345' })
         .expect(403);
       expect(res.body.code).toBe('LICENSE_REQUIRED');
     });

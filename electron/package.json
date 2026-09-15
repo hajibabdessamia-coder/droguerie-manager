@@ -1,7 +1,7 @@
 {
-  "name": "pharma-manager-desktop",
+  "name": "l7ssab-manager-desktop",
   "version": "1.0.0",
-  "description": "نظام نقطة البيع وإدارة المخزون - العقاقير الكهربائية",
+  "description": "نظام نقطة البيع وإدارة المخزون - لأي نوع تجارة",
   "author": "L7ssab Manager",
   "private": true,
   "main": "main.js",

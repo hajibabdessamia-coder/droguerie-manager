@@ -70,7 +70,7 @@ function SidebarBrand() {
   return (
     <div className="flex h-16 items-center gap-2 border-b border-border px-4">
       <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold">
-        ع
+        L7
       </div>
       <div className="leading-tight">
         <p className="text-sm font-semibold">{t('common.appName')}</p>

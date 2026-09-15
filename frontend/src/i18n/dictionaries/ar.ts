@@ -4,7 +4,7 @@
 export const ar = {
   login: {
     title: 'تسجيل الدخول',
-    subtitle: 'نظام إدارة العقاقير الكهربائية',
+    subtitle: 'نظام إدارة المبيعات والمخزون',
     emailLabel: 'البريد الإلكتروني',
     passwordLabel: 'كلمة المرور',
     submit: 'دخول',
@@ -16,8 +16,8 @@ export const ar = {
     label: 'اللغة',
   },
   common: {
-    appName: 'نظام إدارة العقاقير الكهربائية',
-    appTagline: 'جملة وتقسيط',
+    appName: 'L7ssab Manager',
+    appTagline: 'نظام إدارة المبيعات والمخزون',
     closeMenu: 'إغلاق القائمة',
     openMenu: 'فتح القائمة',
     // أدوار المستخدمين — مفهوم مشترك سيُستخدم لاحقاً في صفحات أخرى غير المشمولة

@@ -10,8 +10,8 @@ import { DEFAULT_DIRECTION, DEFAULT_LOCALE } from '@/i18n/types';
 const cairo = Cairo({ subsets: ['arabic', 'latin'], variable: '--font-cairo' });
 
 export const metadata: Metadata = {
-  title: 'نظام إدارة العقاقير الكهربائية',
-  description: 'برنامج لإدارة محل بيع العقاقير الكهربائية بالجملة والتقسيط',
+  title: 'L7ssab Manager',
+  description: 'نظام إدارة المبيعات والمخزون — نقطة بيع وجرد لأي نوع تجارة',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

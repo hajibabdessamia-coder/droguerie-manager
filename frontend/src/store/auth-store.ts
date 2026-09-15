@@ -24,6 +24,8 @@ export const useAuthStore = create<AuthState>()(
       setHasHydrated: (state) => set({ hasHydrated: state }),
     }),
     {
+      // مُجمَّد عمداً على الاسم القديم: تغيير مفتاح التخزين يُخرج كل المستخدمين
+      // الحاليين من جلساتهم بلا فائدة — المفتاح داخلي ولا يظهر في الواجهة
       name: 'pharma-auth',
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true);

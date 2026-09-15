@@ -10,9 +10,9 @@ const prisma = new PrismaClient();
 async function main() {
   const passwordHash = await bcrypt.hash('Admin@12345', 10);
   await prisma.user.upsert({
-    where: { email: 'admin@pharma.local' },
+    where: { email: 'admin@l7ssab.local' },
     update: {},
-    create: { name: 'المدير العام', email: 'admin@pharma.local', passwordHash, role: 'ADMIN', mustChangePassword: true },
+    create: { name: 'المدير العام', email: 'admin@l7ssab.local', passwordHash, role: 'ADMIN', mustChangePassword: true },
   });
 
   await prisma.storeSettings.upsert({
@@ -21,7 +21,7 @@ async function main() {
     create: { id: 'default', name: 'اسم المحل', defaultTaxRate: 0 },
   });
 
-  console.log('تم إعداد قاعدة البيانات النموذجية. حساب المدير: admin@pharma.local / Admin@12345');
+  console.log('تم إعداد قاعدة البيانات النموذجية. حساب المدير: admin@l7ssab.local / Admin@12345');
 }
 
 main()

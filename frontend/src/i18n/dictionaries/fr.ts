@@ -6,7 +6,7 @@ import type { Dictionary } from '../types';
 export const fr: Dictionary = {
   login: {
     title: 'Connexion',
-    subtitle: "Système de gestion de quincaillerie électrique",
+    subtitle: "Système de gestion des ventes et du stock",
     emailLabel: 'Adresse e-mail',
     passwordLabel: 'Mot de passe',
     submit: 'Connexion',
@@ -18,8 +18,8 @@ export const fr: Dictionary = {
     label: 'Langue',
   },
   common: {
-    appName: 'Système de gestion de quincaillerie électrique',
-    appTagline: 'Gros et détail',
+    appName: 'L7ssab Manager',
+    appTagline: 'Gestion des ventes et du stock',
     closeMenu: 'Fermer le menu',
     openMenu: 'Ouvrir le menu',
     roles: {

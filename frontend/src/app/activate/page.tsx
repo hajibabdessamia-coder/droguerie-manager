@@ -72,7 +72,7 @@ export default function ActivatePage() {
       <Card className="w-full max-w-md">
         <CardHeader className="items-center text-center">
           <div className="mb-1 flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-lg font-bold text-primary-foreground">
-            ع
+            L7
           </div>
           <h1 className="text-lg font-semibold text-foreground">{t('activate.title')}</h1>
           <p className="text-sm text-muted-foreground">{t('activate.subtitle')}</p>

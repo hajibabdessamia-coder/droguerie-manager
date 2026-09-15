@@ -79,7 +79,7 @@ export default function LoginPage() {
         <CardHeader className="items-center text-center">
           <LanguageSwitcher />
           <div className="mb-1 flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-lg font-bold text-primary-foreground">
-            ع
+            L7
           </div>
           <h1 className="text-lg font-semibold text-foreground">{t('login.title')}</h1>
           <p className="text-sm text-muted-foreground">{t('login.subtitle')}</p>
@@ -97,7 +97,7 @@ export default function LoginPage() {
                 autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@pharma.local"
+                placeholder="admin@l7ssab.local"
               />
             </div>
             <div className="flex flex-col gap-1.5">

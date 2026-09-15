@@ -23,8 +23,8 @@ async function bootstrap() {
   app.useGlobalFilters(new PrismaExceptionFilter());
 
   const config = new DocumentBuilder()
-    .setTitle('نظام إدارة العقاقير الكهربائية API')
-    .setDescription('واجهة برمجية لإدارة العقاقير الكهربائية بالجملة والتقسيط')
+    .setTitle('L7ssab Manager API')
+    .setDescription('واجهة برمجية لنظام إدارة المبيعات والمخزون')
     .setVersion('1.0')
     .addBearerAuth()
     .build();

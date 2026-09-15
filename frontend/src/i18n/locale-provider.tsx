@@ -13,6 +13,8 @@ import {
 } from './types';
 
 const DICTIONARIES: Record<Locale, Dictionary> = { ar, fr };
+// مُجمَّد عمداً على الاسم القديم: تغييره يُفقد كل مستخدم حالي لغته المختارة
+// ويُعيده للعربية الافتراضية بلا فائدة — المفتاح داخلي ولا يظهر في الواجهة
 const STORAGE_KEY = 'pharma-manager-locale';
 
 function isLocale(value: string | null): value is Locale {

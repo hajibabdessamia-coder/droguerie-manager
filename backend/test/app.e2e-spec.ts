@@ -44,14 +44,14 @@ describe('App (e2e)', () => {
   it('rejects login with a wrong password', async () => {
     await request(app.getHttpServer())
       .post('/api/auth/login')
-      .send({ email: 'admin@pharma.local', password: 'wrong-password' })
+      .send({ email: 'admin@l7ssab.local', password: 'wrong-password' })
       .expect(401);
   });
 
   it('logs in with the seeded admin account', async () => {
     const res = await request(app.getHttpServer())
       .post('/api/auth/login')
-      .send({ email: 'admin@pharma.local', password: 'Admin@12345' })
+      .send({ email: 'admin@l7ssab.local', password: 'Admin@12345' })
       .expect(201);
 
     expect(res.body.accessToken).toEqual(expect.any(String));

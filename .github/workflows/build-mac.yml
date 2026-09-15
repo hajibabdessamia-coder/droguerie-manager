@@ -78,6 +78,6 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: pharma-manager-mac-dmg
+          name: l7ssab-manager-mac-dmg
           path: electron/dist-builds/*.dmg
           retention-days: 30

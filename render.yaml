@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: pharma-manager-backend
+    name: l7ssab-manager-backend
     runtime: node
     rootDir: backend
     plan: free
