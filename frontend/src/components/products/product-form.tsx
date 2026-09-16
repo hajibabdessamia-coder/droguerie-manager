@@ -16,13 +16,14 @@ import { createManufacturer, fetchManufacturers } from '@/lib/manufacturers';
 import { createCategory, fetchCategories } from '@/lib/categories';
 import { createUnit, fetchUnits } from '@/lib/units';
 import { createProduct, generateBarcode, updateProduct, uploadProductImage, type ProductInput } from '@/lib/products';
+import { translateCategoryName, translateUnitName } from '@/lib/catalog-labels';
 import { useLocale } from '@/i18n/locale-provider';
 import type { Product } from '@/types';
 
 export function ProductForm({ product }: { product?: Product }) {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const isEdit = Boolean(product);
 
   const { data: manufacturers } = useQuery({ queryKey: ['manufacturers'], queryFn: fetchManufacturers });
@@ -185,8 +186,8 @@ export function ProductForm({ product }: { product?: Product }) {
                 <Select id="categoryId" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
                   <option value="">{t('productForm.noCategory')}</option>
                   {categories?.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
+                    <option key={c.id} value={c.id} dir="auto">
+                      {translateCategoryName(c.name, locale)}
                     </option>
                   ))}
                 </Select>
@@ -201,8 +202,8 @@ export function ProductForm({ product }: { product?: Product }) {
                 <Select id="unitId" value={unitId} onChange={(e) => setUnitId(e.target.value)}>
                   <option value="">{t('productForm.noUnit')}</option>
                   {units?.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.name}
+                    <option key={u.id} value={u.id} dir="auto">
+                      {translateUnitName(u.name, locale)}
                     </option>
                   ))}
                 </Select>
@@ -217,7 +218,7 @@ export function ProductForm({ product }: { product?: Product }) {
                 <Select id="manufacturerId" value={manufacturerId} onChange={(e) => setManufacturerId(e.target.value)}>
                   <option value="">{t('productForm.noManufacturer')}</option>
                   {manufacturers?.map((m) => (
-                    <option key={m.id} value={m.id}>
+                    <option key={m.id} value={m.id} dir="auto">
                       {m.name}
                     </option>
                   ))}

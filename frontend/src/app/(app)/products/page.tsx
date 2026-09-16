@@ -14,6 +14,7 @@ import { useDebouncedValue } from '@/hooks/use-debounce';
 import { fetchManufacturers } from '@/lib/manufacturers';
 import { fetchCategories } from '@/lib/categories';
 import { deleteProduct, fetchProducts } from '@/lib/products';
+import { translateCategoryName, translateUnitName } from '@/lib/catalog-labels';
 import { formatCurrency } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth-store';
 import { useLocale } from '@/i18n/locale-provider';
@@ -97,7 +98,7 @@ export default function ProductsPage() {
           >
             <option value="">{t('products.allManufacturers')}</option>
             {manufacturers?.map((m) => (
-              <option key={m.id} value={m.id}>
+              <option key={m.id} value={m.id} dir="auto">
                 {m.name}
               </option>
             ))}
@@ -109,8 +110,8 @@ export default function ProductsPage() {
           >
             <option value="">{t('products.allCategories')}</option>
             {categories?.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
+              <option key={c.id} value={c.id} dir="auto">
+                {translateCategoryName(c.name, locale)}
               </option>
             ))}
           </Select>
@@ -180,11 +181,13 @@ export default function ProductsPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">{p.internalCode}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{p.category?.name ?? '—'}</td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {p.category ? translateCategoryName(p.category.name, locale) : '—'}
+                    </td>
                     <td className="px-4 py-3">
                       <Badge variant={low ? 'destructive' : 'secondary'}>
                         {p.quantity} / {p.minStock}
-                        {p.unit ? ` ${p.unit.name}` : ''}
+                        {p.unit ? ` ${translateUnitName(p.unit.name, locale)}` : ''}
                       </Badge>
                     </td>
                     <td className="px-4 py-3">{formatCurrency(p.retailPrice, locale)}</td>

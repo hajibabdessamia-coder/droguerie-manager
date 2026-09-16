@@ -16,6 +16,7 @@ import { authorizeOverride } from '@/lib/auth';
 import { fetchCustomers } from '@/lib/customers';
 import { fetchProducts } from '@/lib/products';
 import { fetchCategories } from '@/lib/categories';
+import { translateCategoryName } from '@/lib/catalog-labels';
 import { createSale } from '@/lib/sales';
 import { fetchStoreSettings } from '@/lib/store-settings';
 import { cn, formatCurrency } from '@/lib/utils';
@@ -228,7 +229,7 @@ export default function PosPage() {
               variant={activeCategoryId === c.id ? 'default' : 'outline'}
               onClick={() => setActiveCategoryId(c.id)}
             >
-              {c.name}
+              {translateCategoryName(c.name, locale)}
             </Button>
           ))}
         </div>
