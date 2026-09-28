@@ -298,6 +298,10 @@ export const ar = {
     returnNumberPrefix: 'إرجاع ',
     returnedByLabel: 'بواسطة',
     returnReasonPrefix: 'السبب: ',
+    returnsTotalLabel: 'المرتجعات',
+    netAfterReturnsLabel: 'الصافي بعد الإرجاع',
+    partialReturnBadge: 'مرتجع جزئي',
+    fullyReturnedBadge: 'مرتجع بالكامل',
   },
   // مفاتيح نقطة البيع (POS) وفاتورتها المطبوعة (المرحلة 6) — النصوص المشتركة مع
   // sales/customers/products مُعاد استخدامها من هناك بدل تكرارها هنا (راجع POS
@@ -443,6 +447,10 @@ export const ar = {
     },
     topProductsTitle: 'أفضل المنتجات مبيعاً',
     leastProductsTitle: 'أقل المنتجات مبيعاً',
+    returnedProductsTitle: 'المنتجات المرجعة',
+    returnedQtyColumn: 'الكمية المرجعة',
+    returnedValueColumn: 'قيمة الإرجاع',
+    returnsDateNote: 'ملاحظة: المرتجعات تُحسب بتاريخ الإرجاع نفسه، وليس بتاريخ الفاتورة الأصلية.',
     noDataForPeriod: 'لا توجد بيانات لهذه الفترة.',
     revenueColumn: 'الإيراد',
     excelExportTitle: 'تصدير إلى Excel',

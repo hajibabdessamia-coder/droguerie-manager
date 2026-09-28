@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
 import { Download, Pencil, Printer, RotateCcw, Trash2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -134,14 +135,29 @@ export default function SaleDetailPage() {
   if (isLoading) return <Skeleton className="h-96 w-full" />;
   if (!sale) return <p className="text-sm text-destructive">{t('sales.notFound')}</p>;
 
+  // مجموع الكميات المباعة مقابل المُرجعة عبر كل عمليات الإرجاع المرتبطة بهذه
+  // الفاتورة، لتحديد شارة "مرتجع جزئي"/"مرتجع بالكامل" ومبلغ الصافي بعد الإرجاع
+  const totalSoldQty = sale.items.reduce((sum, item) => sum + item.quantity, 0);
+  const totalReturnedQty = sale.returns.flatMap((r) => r.items).reduce((sum, item) => sum + item.quantity, 0);
+  const returnsTotalAmount = sale.returns.reduce((sum, r) => sum + Number(r.total), 0);
+  const netAfterReturns = Number(sale.total) - returnsTotalAmount;
+  const isFullyReturned = sale.returns.length > 0 && totalReturnedQty >= totalSoldQty;
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
         <div>
-          <h1 className="text-2xl font-bold">
-            {t('sales.titlePrefix')}
-            {sale.invoiceNumber}
-          </h1>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-2xl font-bold">
+              {t('sales.titlePrefix')}
+              {sale.invoiceNumber}
+            </h1>
+            {sale.returns.length > 0 && (
+              <Badge variant={isFullyReturned ? 'destructive' : 'secondary'}>
+                {isFullyReturned ? t('sales.fullyReturnedBadge') : t('sales.partialReturnBadge')}
+              </Badge>
+            )}
+          </div>
           <p className="mt-1 text-sm text-muted-foreground">{formatDateTime(sale.createdAt, locale)}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -356,6 +372,18 @@ export default function SaleDetailPage() {
               <span>{t('common.grandTotal')}</span>
               <span>{formatCurrency(sale.total, locale)}</span>
             </div>
+            {sale.returns.length > 0 && (
+              <>
+                <div className="flex justify-between text-muted-foreground">
+                  <span>{t('sales.returnsTotalLabel')}</span>
+                  <span>-{formatCurrency(returnsTotalAmount, locale)}</span>
+                </div>
+                <div className="flex justify-between text-base font-bold">
+                  <span>{t('sales.netAfterReturnsLabel')}</span>
+                  <span>{formatCurrency(netAfterReturns, locale)}</span>
+                </div>
+              </>
+            )}
             <div className="flex justify-between text-muted-foreground">
               <span>{t('sales.paidLabel')}</span>
               <span>{formatCurrency(sale.amountPaid, locale)}</span>

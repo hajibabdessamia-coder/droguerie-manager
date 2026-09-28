@@ -103,6 +103,7 @@ export interface SummaryReportData {
   periodLabel: string;
   start: Date;
   end: Date;
+  grossSalesTotal: number;
   salesTotal: number;
   returnsTotal: number;
   profitTotal: number;
@@ -111,6 +112,7 @@ export interface SummaryReportData {
   inventoryValue: number;
   topProducts: ProductStat[];
   leastProducts: ProductStat[];
+  returnedProducts: ProductStat[];
 }
 
 export const SUMMARY_LABELS: Record<InvoiceLocale, {
@@ -118,16 +120,22 @@ export const SUMMARY_LABELS: Record<InvoiceLocale, {
   fromLabel: string;
   toLabel: string;
   totalSales: string;
+  grossSalesLabel: string;
+  breakdownEquals: string;
   returnsTotal: string;
+  returnsNote: string;
   profit: string;
   invoiceCount: string;
   purchasesValue: string;
   inventoryValue: string;
   topProducts: string;
   leastProducts: string;
+  returnedProducts: string;
   productCol: string;
   qtySoldCol: string;
   revenueCol: string;
+  qtyReturnedCol: string;
+  returnedValueCol: string;
   noData: string;
 }> = {
   ar: {
@@ -135,16 +143,22 @@ export const SUMMARY_LABELS: Record<InvoiceLocale, {
     fromLabel: 'من',
     toLabel: 'إلى',
     totalSales: 'صافي المبيعات',
+    grossSalesLabel: 'إجمالي المبيعات',
+    breakdownEquals: 'الصافي',
     returnsTotal: 'قيمة المرتجعات',
+    returnsNote: 'المرتجعات تُحسب بتاريخ الإرجاع نفسه، وليس بتاريخ الفاتورة الأصلية.',
     profit: 'الأرباح',
     invoiceCount: 'عدد الفواتير',
     purchasesValue: 'قيمة المشتريات',
     inventoryValue: 'قيمة المخزون',
     topProducts: 'أفضل المنتجات مبيعاً',
     leastProducts: 'أقل المنتجات مبيعاً',
+    returnedProducts: 'المنتجات المرجعة',
     productCol: 'المنتج',
     qtySoldCol: 'الكمية المباعة',
     revenueCol: 'الإيراد',
+    qtyReturnedCol: 'الكمية المرجعة',
+    returnedValueCol: 'قيمة الإرجاع',
     noData: 'لا توجد بيانات',
   },
   fr: {
@@ -152,16 +166,22 @@ export const SUMMARY_LABELS: Record<InvoiceLocale, {
     fromLabel: 'Du',
     toLabel: 'au',
     totalSales: 'Ventes nettes',
+    grossSalesLabel: 'Ventes totales',
+    breakdownEquals: 'Net',
     returnsTotal: 'Total des retours',
+    returnsNote: "Les retours sont comptabilisés à la date du retour lui-même, et non à la date de la facture d'origine.",
     profit: 'Bénéfices',
     invoiceCount: 'Nombre de factures',
     purchasesValue: 'Valeur des achats',
     inventoryValue: 'Valeur du stock',
     topProducts: 'Meilleurs produits vendus',
     leastProducts: 'Produits les moins vendus',
+    returnedProducts: 'Produits retournés',
     productCol: 'Produit',
     qtySoldCol: 'Quantité vendue',
     revenueCol: 'Revenu',
+    qtyReturnedCol: 'Quantité retournée',
+    returnedValueCol: 'Valeur retournée',
     noData: 'Aucune donnée',
   },
 };
@@ -185,6 +205,8 @@ export function buildSummaryReportHtml(report: SummaryReportData, locale: Invoic
   .card { border: 1px solid #ddd; border-radius: 8px; padding: 12px 16px; min-width: 150px; }
   .card .label { font-size: 11px; color: #666; }
   .card .value { font-size: 18px; font-weight: bold; margin-top: 4px; }
+  .card .breakdown { font-size: 11px; color: #666; margin-top: 4px; }
+  .note { font-size: 11px; color: #888; margin: -12px 0 24px; }
   table { width: 100%; border-collapse: collapse; margin-bottom: 24px; font-size: 13px; }
   th, td { border-bottom: 1px solid #ddd; padding: 6px 8px; text-align: start; }
   th { background: #f5f5f5; }
@@ -196,13 +218,19 @@ export function buildSummaryReportHtml(report: SummaryReportData, locale: Invoic
   <p class="muted">${l.fromLabel} ${formatDate(report.start, locale)} ${l.toLabel} ${formatDate(report.end, locale)}</p>
 
   <div class="grid">
-    <div class="card"><div class="label">${l.totalSales}</div><div class="value">${formatCurrency(report.salesTotal, locale)}</div></div>
+    <div class="card">
+      <div class="label">${l.totalSales}</div>
+      <div class="value">${formatCurrency(report.salesTotal, locale)}</div>
+      <div class="breakdown">${formatCurrency(report.grossSalesTotal, locale)} − ${formatCurrency(report.returnsTotal, locale)} = ${l.breakdownEquals} ${formatCurrency(report.salesTotal, locale)}</div>
+    </div>
     <div class="card"><div class="label">${l.returnsTotal}</div><div class="value">${formatCurrency(report.returnsTotal, locale)}</div></div>
     <div class="card"><div class="label">${l.profit}</div><div class="value">${formatCurrency(report.profitTotal, locale)}</div></div>
     <div class="card"><div class="label">${l.invoiceCount}</div><div class="value">${report.invoiceCount}</div></div>
     <div class="card"><div class="label">${l.purchasesValue}</div><div class="value">${formatCurrency(report.purchasesValue, locale)}</div></div>
     <div class="card"><div class="label">${l.inventoryValue}</div><div class="value">${formatCurrency(report.inventoryValue, locale)}</div></div>
   </div>
+
+  <p class="note">${l.returnsNote}</p>
 
   <h2>${l.topProducts}</h2>
   <table>
@@ -214,6 +242,12 @@ export function buildSummaryReportHtml(report: SummaryReportData, locale: Invoic
   <table>
     <thead><tr><th>${l.productCol}</th><th>${l.qtySoldCol}</th><th>${l.revenueCol}</th></tr></thead>
     <tbody>${report.leastProducts.map(productRow).join('') || emptyRow}</tbody>
+  </table>
+
+  <h2>${l.returnedProducts}</h2>
+  <table>
+    <thead><tr><th>${l.productCol}</th><th>${l.qtyReturnedCol}</th><th>${l.returnedValueCol}</th></tr></thead>
+    <tbody>${report.returnedProducts.map(productRow).join('') || emptyRow}</tbody>
   </table>
 </body>
 </html>`;

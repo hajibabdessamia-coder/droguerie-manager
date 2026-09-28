@@ -113,6 +113,8 @@ export default function ReportsPage() {
         </p>
       )}
 
+      <p className="text-xs text-muted-foreground">{t('reports.returnsDateNote')}</p>
+
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
         {STAT_KEYS.map((key) => (
           <Card key={key}>
@@ -121,9 +123,17 @@ export default function ReportsPage() {
               {isLoading || !report ? (
                 <Skeleton className="mt-2 h-7 w-20" />
               ) : (
-                <p className="mt-1 text-xl font-bold">
-                  {key === 'invoiceCount' ? formatNumber(report[key], locale) : formatCurrency(report[key], locale)}
-                </p>
+                <>
+                  <p className="mt-1 text-xl font-bold">
+                    {key === 'invoiceCount' ? formatNumber(report[key], locale) : formatCurrency(report[key], locale)}
+                  </p>
+                  {key === 'salesTotal' && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {formatCurrency(report.grossSalesTotal, locale)} − {formatCurrency(report.returnsTotal, locale)} ={' '}
+                      {formatCurrency(report.salesTotal, locale)}
+                    </p>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>
@@ -195,6 +205,38 @@ export default function ReportsPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base font-semibold text-foreground">{t('reports.returnedProductsTitle')}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoading && <Skeleton className="h-32 w-full" />}
+          {report && report.returnedProducts.length === 0 && (
+            <p className="text-sm text-muted-foreground">{t('reports.noDataForPeriod')}</p>
+          )}
+          {report && report.returnedProducts.length > 0 && (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border text-start text-muted-foreground">
+                  <th className="py-2 font-medium">{t('common.product')}</th>
+                  <th className="py-2 font-medium">{t('reports.returnedQtyColumn')}</th>
+                  <th className="py-2 font-medium">{t('reports.returnedValueColumn')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {report.returnedProducts.map((p) => (
+                  <tr key={p.name} className="border-b border-border last:border-0">
+                    <td className="py-2">{p.name}</td>
+                    <td className="py-2">{p.qty}</td>
+                    <td className="py-2">{formatCurrency(p.revenue, locale)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

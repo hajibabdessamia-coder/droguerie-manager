@@ -32,13 +32,18 @@ export class ReportsService {
       this.prisma.product.findMany({ where: { isActive: true } }),
     ]);
 
-    let salesTotal = 0;
+    let grossSalesTotal = 0;
     let revenueTotal = 0;
     let costTotal = 0;
+    // مبيعات إجمالية بحتة (بلا خصم إرجاعات) — تُستخدم فقط لقوائم أفضل/أقل المنتجات
+    // مبيعاً. لا تُطرح منها كميات الإرجاعات هنا حتى لا تظهر كميات سالبة مضلِّلة في
+    // هذه القوائم لمنتج أُرجع بكمية دون أن يكون قد بيع أصلاً ضمن نفس الفترة (مثال:
+    // فاتورة بيعت الشهر الماضي وأُرجعت هذا الشهر) — راجع returnedByProduct بالأسفل
+    // للمنتجات المرجعة كقسم مستقل بدل خلطها بأرقام المبيعات
     const soldByProduct = new Map<string, { name: string; qty: number; revenue: number }>();
 
     for (const sale of sales) {
-      salesTotal += Number(sale.total);
+      grossSalesTotal += Number(sale.total);
       revenueTotal += Number(sale.subtotal) - Number(sale.discount);
       for (const item of sale.items) {
         costTotal += item.quantity * Number(item.product.purchasePrice);
@@ -52,29 +57,29 @@ export class ReportsService {
     let returnsTotal = 0;
     let returnsRevenue = 0;
     let returnsCost = 0;
+    const returnedByProduct = new Map<string, { name: string; qty: number; revenue: number }>();
 
     for (const ret of saleReturns) {
       returnsTotal += Number(ret.total);
       returnsRevenue += Number(ret.subtotal) - Number(ret.discountShare);
       for (const item of ret.items) {
         returnsCost += item.quantity * Number(item.product.purchasePrice);
-        const entry = soldByProduct.get(item.productId) ?? { name: item.product.name, qty: 0, revenue: 0 };
-        entry.qty -= item.quantity;
-        entry.revenue -= Number(item.total);
-        soldByProduct.set(item.productId, entry);
+        const entry = returnedByProduct.get(item.productId) ?? { name: item.product.name, qty: 0, revenue: 0 };
+        entry.qty += item.quantity;
+        entry.revenue += Number(item.total);
+        returnedByProduct.set(item.productId, entry);
       }
     }
 
-    const topProducts = [...soldByProduct.values()]
-      .filter((p) => p.qty > 0)
-      .sort((a, b) => b.qty - a.qty)
-      .slice(0, 5);
+    const topProducts = [...soldByProduct.values()].sort((a, b) => b.qty - a.qty).slice(0, 5);
 
     const allProductStats = activeProducts.map((p) => {
       const sold = soldByProduct.get(p.id);
       return { name: p.name, qty: sold?.qty ?? 0, revenue: sold?.revenue ?? 0 };
     });
     const leastProducts = allProductStats.sort((a, b) => a.qty - b.qty).slice(0, 5);
+
+    const returnedProducts = [...returnedByProduct.values()].sort((a, b) => b.qty - a.qty).slice(0, 5);
 
     const inventoryValue = activeProducts.reduce((sum, p) => sum + p.quantity * Number(p.purchasePrice), 0);
 
@@ -83,8 +88,11 @@ export class ReportsService {
       periodLabel: getPeriodLabel(period, locale),
       start,
       end,
-      // صافي بعد خصم الإرجاعات — وليس إجمالي الفواتير المُصدَرة
-      salesTotal: salesTotal - returnsTotal,
+      // إجمالي فواتير البيع الصادرة قبل خصم الإرجاعات — يُستخدم في تفصيل "الإجمالي -
+      // المرتجعات = الصافي" في الواجهة، ولا يُعرض بمفرده ككل الرقم الرئيسي
+      grossSalesTotal,
+      // صافي بعد خصم الإرجاعات — هذا هو رقم "صافي المبيعات" المعروض كبطاقة رئيسية
+      salesTotal: grossSalesTotal - returnsTotal,
       returnsTotal,
       profitTotal: revenueTotal - returnsRevenue - (costTotal - returnsCost),
       invoiceCount: sales.length,
@@ -92,6 +100,7 @@ export class ReportsService {
       inventoryValue,
       topProducts,
       leastProducts,
+      returnedProducts,
     };
   }
 

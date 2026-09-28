@@ -236,6 +236,7 @@ export interface ReportSummary {
   periodLabel: string;
   start: string;
   end: string;
+  grossSalesTotal: number;
   salesTotal: number;
   returnsTotal: number;
   profitTotal: number;
@@ -244,6 +245,7 @@ export interface ReportSummary {
   inventoryValue: number;
   topProducts: ProductStat[];
   leastProducts: ProductStat[];
+  returnedProducts: ProductStat[];
 }
 
 export type BackupStatus = 'SUCCESS' | 'FAILED';
