@@ -28,6 +28,7 @@ model User {
   updatedAt    DateTime @updatedAt
 
   sales      Sale[]
+  saleReturns SaleReturn[]
   purchases  Purchase[]
   auditLogs  AuditLog[]
   priceOverridesGranted PriceOverrideGrant[] @relation("GrantedBy")
@@ -111,6 +112,7 @@ model Product {
   updatedAt        DateTime  @updatedAt
 
   saleItems        SaleItem[]
+  saleReturnItems  SaleReturnItem[]
   purchaseItems    PurchaseItem[]
   stockMovements   StockMovement[]
 
@@ -219,6 +221,7 @@ model Sale {
 
   items         SaleItem[]
   priceOverrideGrants PriceOverrideGrant[]
+  returns       SaleReturn[]
 
   createdAt     DateTime      @default(now())
 
@@ -240,7 +243,52 @@ model SaleItem {
   priceType  String
   total      Decimal
 
+  returnItems SaleReturnItem[]
+
   @@map("sale_items")
+}
+
+// فاتورة إرجاع مرتبطة بفاتورة بيع أصلية (لا تُعدَّل الفاتورة الأصلية ولا تُحذف) —
+// تسمح بإرجاع جزئي (سطر واحد أو أكثر بكمية أقل من المباعة)، وتُحسب حصتها من خصم/ضريبة
+// الفاتورة الأصلية بالتناسب مع قيمة السطور المرتجعة (subtotal المرتجع / subtotal الفاتورة).
+// عمداً بلا onDelete: Cascade من جهة Sale حتى يمنع Prisma حذف فاتورة لها إرجاعات مسجَّلة
+// (راجع SalesService.remove — يعكس المخزون بالكامل فيكرر إرجاع الكميات لو سُمح بالحذف)
+model SaleReturn {
+  id            String   @id @default(cuid())
+  returnNumber  String   @unique
+  saleId        String
+  sale          Sale     @relation(fields: [saleId], references: [id])
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  reason        String?
+
+  subtotal      Decimal // مجموع سطور الإرجاع قبل حصة الخصم/الضريبة
+  discountShare Decimal  @default(0)
+  taxShare      Decimal  @default(0)
+  total         Decimal // المبلغ الفعلي المسترجع = subtotal - discountShare + taxShare
+
+  items         SaleReturnItem[]
+
+  createdAt     DateTime @default(now())
+
+  @@index([saleId])
+  @@map("sale_returns")
+}
+
+model SaleReturnItem {
+  id           String     @id @default(cuid())
+  saleReturnId String
+  saleReturn   SaleReturn @relation(fields: [saleReturnId], references: [id], onDelete: Cascade)
+  saleItemId   String
+  saleItem     SaleItem   @relation(fields: [saleItemId], references: [id])
+  productId    String
+  product      Product    @relation(fields: [productId], references: [id])
+
+  quantity     Int
+  unitPrice    Decimal
+  total        Decimal
+
+  @@map("sale_return_items")
 }
 
 // ============================================================

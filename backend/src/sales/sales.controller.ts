@@ -5,6 +5,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { resolveLocale } from '../common/i18n/locale.util';
 import { CreateSaleDto } from './dto/create-sale.dto';
+import { CreateSaleReturnDto } from './dto/create-sale-return.dto';
 import { UpdateSaleDto } from './dto/update-sale.dto';
 import { SalesService } from './sales.service';
 
@@ -47,5 +48,11 @@ export class SalesController {
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.service.remove(id);
+  }
+
+  @Roles(Role.ADMIN)
+  @Post(':id/returns')
+  createReturn(@Param('id') id: string, @CurrentUser('userId') userId: string, @Body() dto: CreateSaleReturnDto) {
+    return this.service.createReturn(id, userId, dto);
   }
 }

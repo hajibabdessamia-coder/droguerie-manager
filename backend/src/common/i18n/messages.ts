@@ -54,6 +54,18 @@ export const MESSAGES: Record<string, MessageEntry> = {
     ar: 'تفويض المدير غير صالح أو منتهي الصلاحية',
     fr: "L'autorisation du gérant est invalide ou expirée",
   },
+  SALE_RETURN_ITEM_NOT_FOUND: {
+    ar: 'سطر الفاتورة المحدد غير موجود في هذه الفاتورة',
+    fr: "La ligne de facture indiquée n'existe pas dans cette facture",
+  },
+  SALE_RETURN_EXCEEDS_SOLD_QUANTITY: (p) => ({
+    ar: `الكمية المطلوب إرجاعها تتجاوز الكمية القابلة للإرجاع للمنتج: ${p.productName}`,
+    fr: `La quantité à retourner dépasse la quantité restituable pour le produit : ${p.productName}`,
+  }),
+  SALE_HAS_RETURNS_CANNOT_DELETE: {
+    ar: 'لا يمكن حذف فاتورة لها عمليات إرجاع مسجَّلة',
+    fr: 'Impossible de supprimer une facture ayant des retours enregistrés',
+  },
 
   // backup.service.ts
   BACKUP_NOT_FOUND: { ar: 'النسخة الاحتياطية غير موجودة', fr: 'Sauvegarde introuvable' },

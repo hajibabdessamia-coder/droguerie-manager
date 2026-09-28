@@ -41,6 +41,66 @@ function resolveUnitPrice(line: CartLine): number {
 
 const OVERRIDE_TTL_MS = 5 * 60 * 1000;
 
+// لون ثابت لكل فئة بحسب ترتيبها (وليس عشوائياً في كل عرض) — حتى تبقى نفس الفئة
+// بنفس اللون دائماً، مما يسهّل التعرّف السريع على التبويبات في نقطة البيع.
+// الأصناف الكاملة مكتوبة حرفياً (وليست مُركَّبة بـ template literal) لأن Tailwind
+// يفحص الشيفرة المصدرية نصياً بحثاً عن أسماء أصناف كاملة عند البناء
+const CATEGORY_TAB_COLORS = [
+  {
+    active: 'border-rose-600 bg-rose-600 text-white hover:bg-rose-600',
+    idle: 'border-rose-300 bg-rose-50 text-rose-700 hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300 dark:hover:bg-rose-900/60',
+  },
+  {
+    active: 'border-orange-600 bg-orange-600 text-white hover:bg-orange-600',
+    idle: 'border-orange-300 bg-orange-50 text-orange-700 hover:bg-orange-100 dark:border-orange-800 dark:bg-orange-950/40 dark:text-orange-300 dark:hover:bg-orange-900/60',
+  },
+  {
+    active: 'border-amber-600 bg-amber-600 text-white hover:bg-amber-600',
+    idle: 'border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300 dark:hover:bg-amber-900/60',
+  },
+  {
+    active: 'border-lime-600 bg-lime-600 text-white hover:bg-lime-600',
+    idle: 'border-lime-300 bg-lime-50 text-lime-700 hover:bg-lime-100 dark:border-lime-800 dark:bg-lime-950/40 dark:text-lime-300 dark:hover:bg-lime-900/60',
+  },
+  {
+    active: 'border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-600',
+    idle: 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-900/60',
+  },
+  {
+    active: 'border-teal-600 bg-teal-600 text-white hover:bg-teal-600',
+    idle: 'border-teal-300 bg-teal-50 text-teal-700 hover:bg-teal-100 dark:border-teal-800 dark:bg-teal-950/40 dark:text-teal-300 dark:hover:bg-teal-900/60',
+  },
+  {
+    active: 'border-cyan-600 bg-cyan-600 text-white hover:bg-cyan-600',
+    idle: 'border-cyan-300 bg-cyan-50 text-cyan-700 hover:bg-cyan-100 dark:border-cyan-800 dark:bg-cyan-950/40 dark:text-cyan-300 dark:hover:bg-cyan-900/60',
+  },
+  {
+    active: 'border-blue-600 bg-blue-600 text-white hover:bg-blue-600',
+    idle: 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-900/60',
+  },
+  {
+    active: 'border-indigo-600 bg-indigo-600 text-white hover:bg-indigo-600',
+    idle: 'border-indigo-300 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300 dark:hover:bg-indigo-900/60',
+  },
+  {
+    active: 'border-violet-600 bg-violet-600 text-white hover:bg-violet-600',
+    idle: 'border-violet-300 bg-violet-50 text-violet-700 hover:bg-violet-100 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-300 dark:hover:bg-violet-900/60',
+  },
+  {
+    active: 'border-fuchsia-600 bg-fuchsia-600 text-white hover:bg-fuchsia-600',
+    idle: 'border-fuchsia-300 bg-fuchsia-50 text-fuchsia-700 hover:bg-fuchsia-100 dark:border-fuchsia-800 dark:bg-fuchsia-950/40 dark:text-fuchsia-300 dark:hover:bg-fuchsia-900/60',
+  },
+  {
+    active: 'border-pink-600 bg-pink-600 text-white hover:bg-pink-600',
+    idle: 'border-pink-300 bg-pink-50 text-pink-700 hover:bg-pink-100 dark:border-pink-800 dark:bg-pink-950/40 dark:text-pink-300 dark:hover:bg-pink-900/60',
+  },
+] as const;
+
+function categoryTabColorClasses(index: number, active: boolean) {
+  const palette = CATEGORY_TAB_COLORS[index % CATEGORY_TAB_COLORS.length];
+  return active ? palette.active : palette.idle;
+}
+
 export default function PosPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -222,12 +282,13 @@ export default function PosPage() {
           <Button type="button" variant={activeCategoryId === null ? 'default' : 'outline'} onClick={() => setActiveCategoryId(null)}>
             {t('pos.allCategoriesTab')}
           </Button>
-          {categories?.map((c) => (
+          {categories?.map((c, index) => (
             <Button
               key={c.id}
               type="button"
-              variant={activeCategoryId === c.id ? 'default' : 'outline'}
+              variant="outline"
               onClick={() => setActiveCategoryId(c.id)}
+              className={categoryTabColorClasses(index, activeCategoryId === c.id)}
             >
               {translateCategoryName(c.name, locale)}
             </Button>

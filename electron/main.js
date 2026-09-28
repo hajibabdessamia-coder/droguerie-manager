@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell, dialog } = require('electron');
+const { app, BrowserWindow, shell, dialog, ipcMain } = require('electron');
 const { fork } = require('child_process');
 const fs = require('fs');
 const path = require('path');
@@ -66,6 +66,17 @@ function dbTemplatePath() {
   return app.isPackaged
     ? path.join(RES_ROOT, 'db-template.sqlite')
     : path.join(__dirname, 'resources', 'db-template.sqlite');
+}
+
+// يُستخدمان فقط عند تطبيق ترحيلات Prisma على قاعدة بيانات userData الحالية عند كل
+// إقلاع (راجع runPendingMigrations أدناه) — ملفا schema.prisma وmigrations/ مبنيان
+// كموارد إضافية (extraResources)، وليسا جزءاً من backend/dist لأنهما ليسا ملفي TS
+function prismaSchemaPath() {
+  return path.join(RES_ROOT, 'backend', 'prisma', 'schema.prisma');
+}
+
+function prismaCliPath() {
+  return path.join(RES_ROOT, 'backend', 'node_modules', 'prisma', 'build', 'index.js');
 }
 
 function iconPath() {
@@ -143,6 +154,39 @@ function ensureJwtSecret(userDataPath) {
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
   }
   return config.jwtSecret;
+}
+
+// يُطبَّق عند كل إقلاع، بلا شرط، على ملف قاعدة بيانات userData (سواء كان قالباً
+// فارغاً نُسخ للتو أو قاعدة بيانات عميل حقيقية من إصدار أقدم من التطبيق) — يغطي
+// هذا حالة التحديث (upgrade) على جهاز فيه بيانات فعلية بالفعل، حيث لا آلية أخرى
+// تُحدِّث مخطط قاعدة البيانات القديمة. آمن وسريع كـ no-op عندما تكون القاعدة
+// محدَّثة أصلاً: prisma migrate deploy يتتبع الترحيلات المُطبَّقة سابقاً عبر جدول
+// _prisma_migrations، وهو نفس الجدول الذي بُني به db-template.sqlite أصلاً
+// (راجع build-db-template.js) — لذا لا يُعاد تطبيق أي ترحيل قديم عن طريق الخطأ.
+// يجب أن يكتمل هذا وتُغلَق عملية Prisma الفرعية الخاصة به تماماً قبل أن يفتح
+// الخادم الخلفي اتصاله الخاص بنفس الملف، تجنباً لتعارض قفل SQLite
+function runPendingMigrations(dbPath) {
+  return new Promise((resolve, reject) => {
+    const env = {
+      ...process.env,
+      ELECTRON_RUN_AS_NODE: '1',
+      DATABASE_URL: `file:${dbPath.replace(/\\/g, '/')}`,
+    };
+    const child = fork(prismaCliPath(), ['migrate', 'deploy', '--schema', prismaSchemaPath()], {
+      env,
+      silent: true,
+    });
+    let stderr = '';
+    child.stdout?.on('data', () => {});
+    child.stderr?.on('data', (d) => {
+      stderr += d;
+    });
+    child.on('error', reject);
+    child.on('exit', (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`فشل تحديث قاعدة البيانات إلى أحدث إصدار (رمز الخروج ${code}):\n${stderr}`));
+    });
+  });
 }
 
 // يمنع نمو backend.log بلا حدود على تثبيت طويل الأمد عند عميل حقيقي — لا توجد
@@ -351,6 +395,109 @@ function startStaticServer(rootDir, port) {
   });
 }
 
+// ---------- الطباعة ----------
+// إعدادات الطابعة تُحفظ على هذا الجهاز فقط (userData/print-settings.json) وليس في
+// قاعدة البيانات: الطابعة مرتبطة بالجهاز لا بالمحل، ونسخة احتياطية تُستعاد على جهاز
+// آخر يجب ألا تحمل معها اسم طابعة غير موجودة هناك. اسم طابعة فارغ = اعرض نافذة
+// الطباعة المعتادة (السلوك السابق تماماً)
+const PRINT_SETTINGS_DEFAULTS = { receiptPrinter: '', receiptPaper: '80', documentPrinter: '' };
+const MICRONS_PER_CSS_PX = 25400 / 96;
+
+function printSettingsPath() {
+  return path.join(app.getPath('userData'), 'print-settings.json');
+}
+
+function sanitizePrintSettings(input) {
+  const s = input && typeof input === 'object' ? input : {};
+  return {
+    receiptPrinter: typeof s.receiptPrinter === 'string' ? s.receiptPrinter : '',
+    receiptPaper: s.receiptPaper === '58' ? '58' : '80',
+    documentPrinter: typeof s.documentPrinter === 'string' ? s.documentPrinter : '',
+  };
+}
+
+function readPrintSettings() {
+  try {
+    return sanitizePrintSettings(JSON.parse(fs.readFileSync(printSettingsPath(), 'utf8')));
+  } catch {
+    return { ...PRINT_SETTINGS_DEFAULTS };
+  }
+}
+
+// الواجهة الوحيدة المصرَّح لها هي صفحاتنا المقدَّمة من الخادم الاستاتيكي المحلي
+function assertTrustedSender(event) {
+  let host = '';
+  try {
+    host = new URL(event.senderFrame.url).hostname;
+  } catch {
+    // يبقى host فارغاً فيُرفض الطلب أدناه
+  }
+  if (host !== '127.0.0.1') throw new Error('Untrusted print request');
+}
+
+function runPrint(webContents, options) {
+  return new Promise((resolve) => {
+    webContents.print(options, (success, failureReason) => resolve({ success, failureReason }));
+  });
+}
+
+function registerPrintHandlers() {
+  ipcMain.handle('print:list-printers', async (event) => {
+    assertTrustedSender(event);
+    const printers = await event.sender.getPrintersAsync();
+    return printers.map((p) => ({ name: p.name, displayName: p.displayName || p.name, isDefault: !!p.isDefault }));
+  });
+
+  ipcMain.handle('print:get-settings', (event) => {
+    assertTrustedSender(event);
+    return readPrintSettings();
+  });
+
+  ipcMain.handle('print:save-settings', (event, settings) => {
+    assertTrustedSender(event);
+    const clean = sanitizePrintSettings(settings);
+    fs.writeFileSync(printSettingsPath(), JSON.stringify(clean, null, 2), 'utf8');
+    return clean;
+  });
+
+  // kind: 'receipt' (تذكرة حرارية) أو 'document' (A4). يحاول هذا المعالج الطباعة
+  // المباشرة (بلا نافذة) فقط إن كانت هناك طابعة مُعدّة لهذا النوع، ويعيد
+  // { success: false } في كل الحالات الأخرى — الواجهة عندها تستدعي window.print()
+  // العادي (printPage في frontend/src/lib/print.ts).
+  // لا نستدعي webContents.print() لعرض النافذة أبداً: على Electron 43.1.1 + Windows 11
+  // كل استدعاء له بأي خيارات (حتى { printBackground: true } وحدها) يفشل فوراً بـ
+  // "Invalid printer settings" دون أي نافذة — أُعيد إنتاجه في تطبيق Electron معزول
+  // بصفحة بسيطة ومع مجموعات خيارات كاملة؛ فقط الاستدعاء بلا خيارات يعمل. نافذة
+  // window.print() من الواجهة لا تتأثر بهذا الخلل
+  ipcMain.handle('print:run', async (event, request) => {
+    assertTrustedSender(event);
+    const kind = request && request.kind === 'receipt' ? 'receipt' : 'document';
+    const settings = readPrintSettings();
+    const deviceName = kind === 'receipt' ? settings.receiptPrinter : settings.documentPrinter;
+
+    if (deviceName) {
+      const silentOptions = { printBackground: true, silent: true, deviceName };
+      if (kind === 'receipt') {
+        // الورق الحراري رول بلا طول ثابت: نمرّر طول المحتوى الفعلي المقيس في الواجهة
+        // (مع هامش صغير) حتى لا تسحب الطابعة صفحة A4 كاملة من الورق
+        const heightPx = Number(request && request.heightPx);
+        const clampedPx = Number.isFinite(heightPx) ? Math.min(Math.max(heightPx, 100), 20000) : 1123;
+        silentOptions.margins = { marginType: 'none' };
+        silentOptions.pageSize = {
+          width: Number(settings.receiptPaper) * 1000,
+          height: Math.ceil(clampedPx * MICRONS_PER_CSS_PX) + 5000,
+        };
+      } else {
+        silentOptions.pageSize = 'A4';
+      }
+      const result = await runPrint(event.sender, silentOptions);
+      return { success: result.success, failureReason: result.failureReason };
+    }
+
+    return { success: false };
+  });
+}
+
 async function createMainWindow(frontendPort) {
   const win = new BrowserWindow({
     width: 1280,
@@ -360,6 +507,7 @@ async function createMainWindow(frontendPort) {
     title: APP_NAME,
     icon: iconPath(),
     webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
       // يمنع الوصول لأدوات المطوّر (F12 وغيره) في النسخة المُعبّأة النهائية —
@@ -381,10 +529,12 @@ async function createMainWindow(frontendPort) {
 app.whenReady().then(async () => {
   const userDataPath = app.getPath('userData');
   fs.mkdirSync(userDataPath, { recursive: true });
+  registerPrintHandlers();
 
   try {
     applyPendingRestore(userDataPath);
     const dbPath = ensureDatabase(userDataPath);
+    await runPendingMigrations(dbPath);
     const jwtSecret = ensureJwtSecret(userDataPath);
     const frontendPort = await getFreePort();
 

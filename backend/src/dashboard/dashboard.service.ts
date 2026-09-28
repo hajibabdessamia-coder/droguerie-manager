@@ -9,8 +9,14 @@ export class DashboardService {
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
 
-    const [todaySales, totalInvoices, totalProducts, activeProducts, recentSales] = await Promise.all([
+    const [todaySales, todayReturns, totalInvoices, totalProducts, activeProducts, recentSales] = await Promise.all([
       this.prisma.sale.findMany({
+        where: { createdAt: { gte: startOfDay } },
+        include: { items: { include: { product: { select: { purchasePrice: true } } } } },
+      }),
+      // بنفس منطق تقارير الفترات: الإرجاع يُخفّض ربح اليوم الذي حدث فيه هو، بصرف
+      // النظر عن تاريخ الفاتورة الأصلية (راجع ReportsService.getSummary)
+      this.prisma.saleReturn.findMany({
         where: { createdAt: { gte: startOfDay } },
         include: { items: { include: { product: { select: { purchasePrice: true } } } } },
       }),
@@ -30,6 +36,12 @@ export class DashboardService {
       revenueToday += Number(sale.subtotal) - Number(sale.discount);
       for (const item of sale.items) {
         costToday += item.quantity * Number(item.product.purchasePrice);
+      }
+    }
+    for (const ret of todayReturns) {
+      revenueToday -= Number(ret.subtotal) - Number(ret.discountShare);
+      for (const item of ret.items) {
+        costToday -= item.quantity * Number(item.product.purchasePrice);
       }
     }
 

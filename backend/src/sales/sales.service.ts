@@ -4,6 +4,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { CreateSaleDto } from './dto/create-sale.dto';
+import { CreateSaleReturnDto } from './dto/create-sale-return.dto';
 import { UpdateSaleDto } from './dto/update-sale.dto';
 
 @Injectable()
@@ -117,6 +118,10 @@ export class SalesService {
         items: { include: { product: true } },
         customer: true,
         seller: { select: { id: true, name: true } },
+        returns: {
+          include: { items: { include: { product: true } }, user: { select: { id: true, name: true } } },
+          orderBy: { createdAt: 'desc' },
+        },
       },
     });
     if (!sale) throw new NotFoundException({ code: 'SALE_NOT_FOUND' });
@@ -164,6 +169,13 @@ export class SalesService {
   async remove(id: string) {
     const sale = await this.findOne(id);
 
+    // لو حُذفت الفاتورة هنا مع وجود إرجاعات مسجَّلة، ستُضاف الكمية الكاملة المباعة
+    // أصلاً إلى المخزون رغم أن جزءاً منها أُعيد بالفعل عبر SaleReturn — إرجاع مضاعف.
+    // امنع الحذف واطلب من المستخدم التعامل مع الإرجاعات أولاً بدل حساب استثناء معقد هنا
+    if (sale.returns.length > 0) {
+      throw new BadRequestException({ code: 'SALE_HAS_RETURNS_CANNOT_DELETE' });
+    }
+
     return this.prisma.$transaction(async (tx) => {
       for (const item of sale.items) {
         await tx.product.update({ where: { id: item.productId }, data: { quantity: { increment: item.quantity } } });
@@ -183,6 +195,94 @@ export class SalesService {
 
       await tx.sale.delete({ where: { id } });
       return { ok: true };
+    });
+  }
+
+  // فاتورة إرجاع منفصلة مرتبطة بالفاتورة الأصلية (لا تعديل ولا حذف للفاتورة الأصلية).
+  // تسمح بإرجاع جزئي: سطر واحد أو أكثر، بكمية أقل من أو تساوي (الكمية المباعة -
+  // الكمية المرتجعة سابقاً لنفس السطر عبر إرجاعات سابقة). حصة الخصم/الضريبة من
+  // الفاتورة الأصلية تُوزَّع بالتناسب مع قيمة السطور المرتجعة، وليس بالتساوي
+  async createReturn(saleId: string, userId: string, dto: CreateSaleReturnDto) {
+    const sale = await this.findOne(saleId);
+
+    const alreadyReturned = new Map<string, number>();
+    for (const ret of sale.returns) {
+      for (const item of ret.items) {
+        alreadyReturned.set(item.saleItemId, (alreadyReturned.get(item.saleItemId) ?? 0) + item.quantity);
+      }
+    }
+
+    let itemsSubtotal = 0;
+    const itemsData = dto.items.map((entry) => {
+      const saleItem = sale.items.find((i) => i.id === entry.saleItemId);
+      if (!saleItem) throw new NotFoundException({ code: 'SALE_RETURN_ITEM_NOT_FOUND' });
+
+      const returnedSoFar = alreadyReturned.get(saleItem.id) ?? 0;
+      const remaining = saleItem.quantity - returnedSoFar;
+      if (entry.quantity > remaining) {
+        throw new BadRequestException({
+          code: 'SALE_RETURN_EXCEEDS_SOLD_QUANTITY',
+          params: { productName: saleItem.product?.name ?? saleItem.productId },
+        });
+      }
+
+      const unitPrice = Number(saleItem.unitPrice);
+      const total = unitPrice * entry.quantity;
+      itemsSubtotal += total;
+      return { saleItemId: saleItem.id, productId: saleItem.productId, quantity: entry.quantity, unitPrice, total };
+    });
+
+    const saleSubtotal = Number(sale.subtotal);
+    const proportion = saleSubtotal > 0 ? itemsSubtotal / saleSubtotal : 0;
+    const discountShare = Number(sale.discount) * proportion;
+    const taxableShare = Math.max(0, itemsSubtotal - discountShare);
+    const taxShare = taxableShare * (Number(sale.taxRate) / 100);
+    const total = taxableShare + taxShare;
+
+    return this.prisma.$transaction(async (tx) => {
+      const returnNumber = await this.nextReturnNumber(tx);
+
+      const saleReturn = await tx.saleReturn.create({
+        data: {
+          returnNumber,
+          saleId,
+          userId,
+          reason: dto.reason,
+          subtotal: itemsSubtotal,
+          discountShare,
+          taxShare,
+          total,
+          items: { create: itemsData },
+        },
+        include: { items: { include: { product: true } }, user: { select: { id: true, name: true } } },
+      });
+
+      for (const item of itemsData) {
+        await tx.product.update({ where: { id: item.productId }, data: { quantity: { increment: item.quantity } } });
+        await tx.stockMovement.create({
+          data: {
+            productId: item.productId,
+            type: 'RETURN',
+            quantity: item.quantity,
+            reason: `إرجاع ${returnNumber} من فاتورة #${sale.invoiceNumber}`,
+          },
+        });
+      }
+
+      if (sale.paymentMethod === 'CREDIT' && sale.customerId) {
+        await tx.customer.update({ where: { id: sale.customerId }, data: { balance: { decrement: total } } });
+      }
+
+      await this.audit.log(
+        userId,
+        'SALE_RETURN',
+        'SaleReturn',
+        saleReturn.id,
+        `إرجاع ${returnNumber} من فاتورة ${sale.invoiceNumber} بقيمة ${total}`,
+        tx,
+      );
+
+      return saleReturn;
     });
   }
 
@@ -241,6 +341,15 @@ export class SalesService {
       today.getDate(),
     ).padStart(2, '0')}`;
     const countToday = await tx.sale.count({ where: { invoiceNumber: { startsWith: prefix } } });
+    return `${prefix}-${String(countToday + 1).padStart(4, '0')}`;
+  }
+
+  private async nextReturnNumber(tx: Prisma.TransactionClient) {
+    const today = new Date();
+    const prefix = `RET-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(
+      today.getDate(),
+    ).padStart(2, '0')}`;
+    const countToday = await tx.saleReturn.count({ where: { returnNumber: { startsWith: prefix } } });
     return `${prefix}-${String(countToday + 1).padStart(4, '0')}`;
   }
 }

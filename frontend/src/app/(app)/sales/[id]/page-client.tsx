@@ -4,17 +4,18 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
-import { Download, Pencil, Printer, Trash2 } from 'lucide-react';
+import { Download, Pencil, Printer, RotateCcw, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { deleteSale, downloadSaleInvoicePdf, fetchSale, updateSale } from '@/lib/sales';
+import { createSaleReturn, deleteSale, downloadSaleInvoicePdf, fetchSale, updateSale } from '@/lib/sales';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import { useRouteId } from '@/lib/use-route-id';
 import { useAuthStore } from '@/store/auth-store';
+import { printPage } from '@/lib/print';
 import { useLocale } from '@/i18n/locale-provider';
 import type { InvoiceType, PaymentMethod } from '@/types';
 
@@ -35,6 +36,11 @@ export default function SaleDetailPage() {
   const [amountPaid, setAmountPaid] = useState('0');
   const [error, setError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const [returning, setReturning] = useState(false);
+  const [returnQuantities, setReturnQuantities] = useState<Record<string, string>>({});
+  const [returnReason, setReturnReason] = useState('');
+  const [returnError, setReturnError] = useState<string | null>(null);
 
   function startEditing() {
     if (!sale) return;
@@ -82,6 +88,49 @@ export default function SaleDetailPage() {
     },
   });
 
+  // الكمية المتبقية القابلة للإرجاع من هذا السطر = المباعة ناقص ما أُرجع منه سابقاً
+  // عبر إرجاعات سابقة مرتبطة بنفس الفاتورة
+  function remainingReturnable(saleItemId: string, soldQuantity: number): number {
+    const alreadyReturned = (sale?.returns ?? [])
+      .flatMap((r) => r.items)
+      .filter((ri) => ri.saleItemId === saleItemId)
+      .reduce((sum, ri) => sum + ri.quantity, 0);
+    return soldQuantity - alreadyReturned;
+  }
+
+  function startReturning() {
+    setReturnQuantities({});
+    setReturnReason('');
+    setReturnError(null);
+    setReturning(true);
+  }
+
+  const returnMutation = useMutation({
+    mutationFn: () =>
+      createSaleReturn(id, {
+        reason: returnReason || undefined,
+        items: Object.entries(returnQuantities)
+          .map(([saleItemId, qty]) => ({ saleItemId, quantity: Number(qty) || 0 }))
+          .filter((entry) => entry.quantity > 0),
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['sale', id] });
+      await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
+      setReturning(false);
+    },
+    onError: (err) => {
+      const message = isAxiosError(err) ? err.response?.data?.message : undefined;
+      setReturnError(message ?? t('sales.returnGenericError'));
+    },
+  });
+
+  function submitReturn() {
+    setReturnError(null);
+    const hasSelection = Object.values(returnQuantities).some((qty) => (Number(qty) || 0) > 0);
+    if (!hasSelection) return setReturnError(t('sales.returnEmptySelectionError'));
+    returnMutation.mutate();
+  }
+
   if (isLoading) return <Skeleton className="h-96 w-full" />;
   if (!sale) return <p className="text-sm text-destructive">{t('sales.notFound')}</p>;
 
@@ -96,7 +145,7 @@ export default function SaleDetailPage() {
           <p className="mt-1 text-sm text-muted-foreground">{formatDateTime(sale.createdAt, locale)}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button type="button" variant="outline" onClick={() => window.print()}>
+          <Button type="button" variant="outline" onClick={() => printPage('document')}>
             <Printer className="h-4 w-4" />
             {t('sales.reprintButton')}
           </Button>
@@ -115,10 +164,18 @@ export default function SaleDetailPage() {
               {t('common.edit')}
             </Button>
           )}
+          {isAdmin && !returning && (
+            <Button type="button" variant="outline" onClick={startReturning}>
+              <RotateCcw className="h-4 w-4" />
+              {t('sales.returnButton')}
+            </Button>
+          )}
           {isAdmin && (
             <Button
               type="button"
               variant="outline"
+              disabled={sale.returns.length > 0}
+              title={sale.returns.length > 0 ? t('sales.deleteBlockedByReturns') : undefined}
               onClick={() => {
                 if (
                   window.confirm(
@@ -192,6 +249,66 @@ export default function SaleDetailPage() {
         </Card>
       )}
 
+      {returning && (
+        <Card className="print:hidden">
+          <CardHeader>
+            <CardTitle className="text-base font-semibold text-foreground">{t('sales.returnCardTitle')}</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border text-start text-muted-foreground">
+                  <th className="py-2 font-medium">{t('common.product')}</th>
+                  <th className="py-2 font-medium">{t('sales.returnRemainingColumn')}</th>
+                  <th className="py-2 font-medium">{t('sales.returnQuantityColumn')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sale.items.map((item) => {
+                  const remaining = remainingReturnable(item.id, item.quantity);
+                  return (
+                    <tr key={item.id} className="border-b border-border last:border-0">
+                      <td className="py-2">{item.product?.name ?? item.productId}</td>
+                      <td className="py-2">{remaining}</td>
+                      <td className="py-2">
+                        <Input
+                          type="number"
+                          min="0"
+                          max={remaining}
+                          step="1"
+                          className="h-8 w-24 text-xs"
+                          disabled={remaining <= 0}
+                          value={returnQuantities[item.id] ?? ''}
+                          onChange={(e) =>
+                            setReturnQuantities((prev) => ({ ...prev, [item.id]: e.target.value }))
+                          }
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="returnReason">{t('sales.returnReasonLabel')}</Label>
+              <Input id="returnReason" value={returnReason} onChange={(e) => setReturnReason(e.target.value)} />
+            </div>
+
+            {returnError && <p className="text-sm text-destructive">{returnError}</p>}
+
+            <div className="flex gap-3">
+              <Button type="button" variant="outline" onClick={() => setReturning(false)}>
+                {t('common.cancel')}
+              </Button>
+              <Button type="button" disabled={returnMutation.isPending} onClick={submitReturn}>
+                {returnMutation.isPending ? t('sales.returnSubmitLoading') : t('sales.returnSubmitButton')}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle className="text-base font-semibold text-foreground">
@@ -250,6 +367,45 @@ export default function SaleDetailPage() {
           </div>
         </CardContent>
       </Card>
+
+      {sale.returns.length > 0 && (
+        <Card className="print:hidden">
+          <CardHeader>
+            <CardTitle className="text-base font-semibold text-foreground">{t('sales.returnsHistoryTitle')}</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            {sale.returns.map((ret) => (
+              <div key={ret.id} className="flex flex-col gap-2 rounded-lg border border-border p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm font-semibold">
+                    {t('sales.returnNumberPrefix')}
+                    {ret.returnNumber}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{formatDateTime(ret.createdAt, locale)}</p>
+                </div>
+                <table className="w-full text-sm">
+                  <tbody>
+                    {ret.items.map((item) => (
+                      <tr key={item.id} className="border-b border-border last:border-0">
+                        <td className="py-1.5">{item.product?.name ?? item.productId}</td>
+                        <td className="py-1.5 text-end">{item.quantity}</td>
+                        <td className="py-1.5 text-end">{formatCurrency(item.total, locale)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                  <p className="text-muted-foreground">
+                    {ret.user && `${t('sales.returnedByLabel')}: ${ret.user.name}`}
+                    {ret.reason && ` — ${t('sales.returnReasonPrefix')}${ret.reason}`}
+                  </p>
+                  <p className="font-semibold">{formatCurrency(ret.total, locale)}</p>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

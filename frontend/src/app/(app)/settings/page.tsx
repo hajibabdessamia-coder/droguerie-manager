@@ -15,6 +15,7 @@ import { createUnit, deleteUnit, fetchUnits, updateUnit } from '@/lib/units';
 import { formatDateTime } from '@/lib/utils';
 import { useLocale } from '@/i18n/locale-provider';
 import { NamedListManager } from '@/components/settings/named-list-manager';
+import { PrintingSettings } from '@/components/settings/printing-settings';
 
 export default function SettingsPage() {
   const { t, locale } = useLocale();
@@ -223,6 +224,8 @@ export default function SettingsPage() {
           </Button>
         </div>
       </form>
+
+      <PrintingSettings />
 
       <div className="flex flex-col gap-4">
         <div>

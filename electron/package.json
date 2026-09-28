@@ -26,6 +26,7 @@
     },
     "files": [
       "main.js",
+      "preload.js",
       "package.json"
     ],
     "extraResources": [
@@ -36,6 +37,14 @@
       {
         "from": "../backend/node_modules",
         "to": "backend/node_modules"
+      },
+      {
+        "from": "../backend/prisma/schema.prisma",
+        "to": "backend/prisma/schema.prisma"
+      },
+      {
+        "from": "../backend/prisma/migrations",
+        "to": "backend/prisma/migrations"
       },
       {
         "from": "../backend/.puppeteer-cache",

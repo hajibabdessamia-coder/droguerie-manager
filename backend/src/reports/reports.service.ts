@@ -13,8 +13,15 @@ export class ReportsService {
   async getSummary(period: ReportPeriod, dateStr?: string, locale: InvoiceLocale = 'ar') {
     const { start, end } = getPeriodRange(period, dateStr);
 
-    const [sales, purchasesAgg, activeProducts] = await Promise.all([
+    const [sales, saleReturns, purchasesAgg, activeProducts] = await Promise.all([
       this.prisma.sale.findMany({
+        where: { createdAt: { gte: start, lt: end } },
+        include: { items: { include: { product: { select: { id: true, name: true, purchasePrice: true } } } } },
+      }),
+      // الإرجاعات تُحسب بتاريخ حدوثها (createdAt الخاص بها)، وليس بتاريخ الفاتورة
+      // الأصلية — إرجاع يحدث في فترة تقرير لاحقة يُخفّض صافي مبيعات تلك الفترة هي،
+      // حتى لو كانت الفاتورة الأصلية ضمن فترة سابقة لم تعد ضمن نطاق هذا الاستعلام
+      this.prisma.saleReturn.findMany({
         where: { createdAt: { gte: start, lt: end } },
         include: { items: { include: { product: { select: { id: true, name: true, purchasePrice: true } } } } },
       }),
@@ -42,7 +49,26 @@ export class ReportsService {
       }
     }
 
-    const topProducts = [...soldByProduct.values()].sort((a, b) => b.qty - a.qty).slice(0, 5);
+    let returnsTotal = 0;
+    let returnsRevenue = 0;
+    let returnsCost = 0;
+
+    for (const ret of saleReturns) {
+      returnsTotal += Number(ret.total);
+      returnsRevenue += Number(ret.subtotal) - Number(ret.discountShare);
+      for (const item of ret.items) {
+        returnsCost += item.quantity * Number(item.product.purchasePrice);
+        const entry = soldByProduct.get(item.productId) ?? { name: item.product.name, qty: 0, revenue: 0 };
+        entry.qty -= item.quantity;
+        entry.revenue -= Number(item.total);
+        soldByProduct.set(item.productId, entry);
+      }
+    }
+
+    const topProducts = [...soldByProduct.values()]
+      .filter((p) => p.qty > 0)
+      .sort((a, b) => b.qty - a.qty)
+      .slice(0, 5);
 
     const allProductStats = activeProducts.map((p) => {
       const sold = soldByProduct.get(p.id);
@@ -57,8 +83,10 @@ export class ReportsService {
       periodLabel: getPeriodLabel(period, locale),
       start,
       end,
-      salesTotal,
-      profitTotal: revenueTotal - costTotal,
+      // صافي بعد خصم الإرجاعات — وليس إجمالي الفواتير المُصدَرة
+      salesTotal: salesTotal - returnsTotal,
+      returnsTotal,
+      profitTotal: revenueTotal - returnsRevenue - (costTotal - returnsCost),
       invoiceCount: sales.length,
       purchasesValue: Number(purchasesAgg._sum.total ?? 0),
       inventoryValue,
@@ -82,6 +110,7 @@ export class ReportsService {
         customer: { select: { name: true } },
         seller: { select: { name: true } },
         items: { include: { product: { select: { purchasePrice: true } } } },
+        returns: { include: { items: { include: { product: { select: { purchasePrice: true } } } } } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -89,6 +118,14 @@ export class ReportsService {
     const rows = sales.map((sale) => {
       const cost = sale.items.reduce((sum, item) => sum + item.quantity * Number(item.product.purchasePrice), 0);
       const profit = Number(sale.subtotal) - Number(sale.discount) - cost;
+
+      const returned = sale.returns.reduce((sum, ret) => sum + Number(ret.total), 0);
+      const returnedRevenue = sale.returns.reduce((sum, ret) => sum + Number(ret.subtotal) - Number(ret.discountShare), 0);
+      const returnedCost = sale.returns.reduce(
+        (sum, ret) => sum + ret.items.reduce((s, item) => s + item.quantity * Number(item.product.purchasePrice), 0),
+        0,
+      );
+
       return {
         invoiceNumber: sale.invoiceNumber,
         date: sale.createdAt.toLocaleString(dateLocale),
@@ -98,7 +135,9 @@ export class ReportsService {
         discount: Number(sale.discount),
         tax: Number(sale.taxAmount),
         total: Number(sale.total),
-        profit,
+        returned,
+        netTotal: Number(sale.total) - returned,
+        profit: profit - (returnedRevenue - returnedCost),
         paymentMethod: l.paymentMethod[sale.paymentMethod as 'CASH' | 'CREDIT'],
       };
     });
@@ -114,6 +153,8 @@ export class ReportsService {
         { header: l.sales.discount, key: 'discount', width: 12 },
         { header: l.sales.tax, key: 'tax', width: 12 },
         { header: l.sales.total, key: 'total', width: 15 },
+        { header: l.sales.returned, key: 'returned', width: 15 },
+        { header: l.sales.netTotal, key: 'netTotal', width: 15 },
         { header: l.sales.profit, key: 'profit', width: 15 },
         { header: l.sales.paymentMethod, key: 'paymentMethod', width: 15 },
       ],

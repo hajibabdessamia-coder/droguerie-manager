@@ -23,8 +23,9 @@ import type { ReportPeriod } from '@/types';
 
 const PERIOD_VALUES: ReportPeriod[] = ['daily', 'weekly', 'monthly', 'yearly'];
 
-const STAT_KEYS: ('salesTotal' | 'profitTotal' | 'invoiceCount' | 'purchasesValue' | 'inventoryValue')[] = [
+const STAT_KEYS: ('salesTotal' | 'returnsTotal' | 'profitTotal' | 'invoiceCount' | 'purchasesValue' | 'inventoryValue')[] = [
   'salesTotal',
+  'returnsTotal',
   'profitTotal',
   'invoiceCount',
   'purchasesValue',
@@ -112,7 +113,7 @@ export default function ReportsPage() {
         </p>
       )}
 
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
         {STAT_KEYS.map((key) => (
           <Card key={key}>
             <CardContent className="p-5">

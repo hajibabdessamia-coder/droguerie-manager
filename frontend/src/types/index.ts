@@ -164,6 +164,31 @@ export interface SaleItemDetail {
   product?: Product;
 }
 
+export interface SaleReturnItemDetail {
+  id: string;
+  saleItemId: string;
+  productId: string;
+  quantity: number;
+  unitPrice: string;
+  total: string;
+  product?: Product;
+}
+
+export interface SaleReturnDetail {
+  id: string;
+  returnNumber: string;
+  saleId: string;
+  userId: string;
+  user?: { id: string; name: string };
+  reason?: string | null;
+  subtotal: string;
+  discountShare: string;
+  taxShare: string;
+  total: string;
+  items: SaleReturnItemDetail[];
+  createdAt: string;
+}
+
 export interface SaleDetail {
   id: string;
   invoiceNumber: string;
@@ -181,6 +206,7 @@ export interface SaleDetail {
   changeDue: string;
   paymentMethod: PaymentMethod;
   items: SaleItemDetail[];
+  returns: SaleReturnDetail[];
   createdAt: string;
 }
 
@@ -211,6 +237,7 @@ export interface ReportSummary {
   start: string;
   end: string;
   salesTotal: number;
+  returnsTotal: number;
   profitTotal: number;
   invoiceCount: number;
   purchasesValue: number;

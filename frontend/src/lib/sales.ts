@@ -1,5 +1,5 @@
 import { apiClient } from './api-client';
-import type { InvoiceType, PaymentMethod, PriceType, SaleDetail } from '@/types';
+import type { InvoiceType, PaymentMethod, PriceType, SaleDetail, SaleReturnDetail } from '@/types';
 
 export interface SaleItemInput {
   productId: string;
@@ -49,6 +49,16 @@ export async function updateSale(id: string, input: UpdateSaleInput): Promise<Sa
 
 export async function deleteSale(id: string): Promise<void> {
   await apiClient.delete(`/sales/${id}`);
+}
+
+export interface CreateSaleReturnInput {
+  reason?: string;
+  items: { saleItemId: string; quantity: number }[];
+}
+
+export async function createSaleReturn(saleId: string, input: CreateSaleReturnInput): Promise<SaleReturnDetail> {
+  const { data } = await apiClient.post<SaleReturnDetail>(`/sales/${saleId}/returns`, input);
+  return data;
 }
 
 export async function downloadSaleInvoicePdf(id: string, invoiceNumber: string, locale: 'ar' | 'fr' = 'ar'): Promise<void> {

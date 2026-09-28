@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { BarcodeSvg } from '@/components/products/barcode-svg';
 import { fetchProducts, generateBarcode, updateProduct } from '@/lib/products';
+import { printPage } from '@/lib/print';
 import { useLocale } from '@/i18n/locale-provider';
 import type { Product } from '@/types';
 
@@ -71,7 +72,7 @@ export default function BarcodeLabelsPage() {
           <h1 className="text-2xl font-bold">{t('barcodeLabels.pageTitle')}</h1>
           <p className="mt-1 text-sm text-muted-foreground">{t('barcodeLabels.subtitle')}</p>
         </div>
-        <Button type="button" onClick={() => window.print()} disabled={labels.length === 0}>
+        <Button type="button" onClick={() => printPage('document')} disabled={labels.length === 0}>
           <Printer className="h-4 w-4" />
           {t('barcodeLabels.printButton')}
         </Button>

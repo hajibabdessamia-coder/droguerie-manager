@@ -104,6 +104,7 @@ export interface SummaryReportData {
   start: Date;
   end: Date;
   salesTotal: number;
+  returnsTotal: number;
   profitTotal: number;
   invoiceCount: number;
   purchasesValue: number;
@@ -117,6 +118,7 @@ export const SUMMARY_LABELS: Record<InvoiceLocale, {
   fromLabel: string;
   toLabel: string;
   totalSales: string;
+  returnsTotal: string;
   profit: string;
   invoiceCount: string;
   purchasesValue: string;
@@ -132,7 +134,8 @@ export const SUMMARY_LABELS: Record<InvoiceLocale, {
     reportTitlePrefix: 'تقرير',
     fromLabel: 'من',
     toLabel: 'إلى',
-    totalSales: 'إجمالي المبيعات',
+    totalSales: 'صافي المبيعات',
+    returnsTotal: 'قيمة المرتجعات',
     profit: 'الأرباح',
     invoiceCount: 'عدد الفواتير',
     purchasesValue: 'قيمة المشتريات',
@@ -148,7 +151,8 @@ export const SUMMARY_LABELS: Record<InvoiceLocale, {
     reportTitlePrefix: 'Rapport',
     fromLabel: 'Du',
     toLabel: 'au',
-    totalSales: 'Total des ventes',
+    totalSales: 'Ventes nettes',
+    returnsTotal: 'Total des retours',
     profit: 'Bénéfices',
     invoiceCount: 'Nombre de factures',
     purchasesValue: 'Valeur des achats',
@@ -193,6 +197,7 @@ export function buildSummaryReportHtml(report: SummaryReportData, locale: Invoic
 
   <div class="grid">
     <div class="card"><div class="label">${l.totalSales}</div><div class="value">${formatCurrency(report.salesTotal, locale)}</div></div>
+    <div class="card"><div class="label">${l.returnsTotal}</div><div class="value">${formatCurrency(report.returnsTotal, locale)}</div></div>
     <div class="card"><div class="label">${l.profit}</div><div class="value">${formatCurrency(report.profitTotal, locale)}</div></div>
     <div class="card"><div class="label">${l.invoiceCount}</div><div class="value">${report.invoiceCount}</div></div>
     <div class="card"><div class="label">${l.purchasesValue}</div><div class="value">${formatCurrency(report.purchasesValue, locale)}</div></div>

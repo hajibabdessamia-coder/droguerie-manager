@@ -1,4 +1,4 @@
-import { BadRequestException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { SalesService } from './sales.service';
 
 const PRODUCT = {
@@ -9,10 +9,15 @@ const PRODUCT = {
   wholesalePrice: 10,
 };
 
-function buildService(overrides?: { jwtVerify?: jest.Mock }) {
+function buildService(overrides?: { jwtVerify?: jest.Mock; saleFindUnique?: jest.Mock }) {
   const txSale = { create: jest.fn(async (args) => ({ id: 'sale-1', invoiceNumber: 'INV-20260101-0001', ...args.data })) };
+  const txSaleReturn = {
+    create: jest.fn(async (args) => ({ id: 'return-1', returnNumber: 'RET-20260101-0001', ...args.data })),
+    count: jest.fn().mockResolvedValue(0),
+  };
   const tx = {
     sale: { ...txSale, count: jest.fn().mockResolvedValue(0) },
+    saleReturn: txSaleReturn,
     priceOverrideGrant: { create: jest.fn() },
     product: { update: jest.fn() },
     stockMovement: { create: jest.fn() },
@@ -21,6 +26,7 @@ function buildService(overrides?: { jwtVerify?: jest.Mock }) {
 
   const prisma = {
     product: { findMany: jest.fn().mockResolvedValue([PRODUCT]) },
+    sale: { findUnique: overrides?.saleFindUnique ?? jest.fn() },
     $transaction: jest.fn(async (cb: (tx: unknown) => unknown) => cb(tx)),
   };
 
@@ -29,6 +35,24 @@ function buildService(overrides?: { jwtVerify?: jest.Mock }) {
 
   const service = new SalesService(prisma as never, jwt as never, audit as never);
   return { service, prisma, jwt, audit, tx };
+}
+
+// فاتورة بيع افتراضية لسطر واحد: 5 وحدات × 15 = 75 قبل خصم/ضريبة الفاتورة (10 خصم، 10% ضريبة)
+function buildSoldSale(overrides?: { returns?: unknown[]; paymentMethod?: string; customerId?: string | null }) {
+  return {
+    id: 'sale-1',
+    invoiceNumber: 'INV-20260101-0001',
+    subtotal: 75,
+    discount: 10,
+    taxRate: 10,
+    total: 71.5,
+    paymentMethod: overrides?.paymentMethod ?? 'CASH',
+    customerId: overrides?.customerId ?? null,
+    items: [
+      { id: 'item-1', productId: 'prod-1', quantity: 5, unitPrice: 15, product: { name: 'Test Product' } },
+    ],
+    returns: overrides?.returns ?? [],
+  };
 }
 
 describe('SalesService.create', () => {
@@ -153,5 +177,97 @@ describe('SalesService.create', () => {
       where: { id: 'cust-1' },
       data: { balance: { increment: 15 } },
     });
+  });
+});
+
+describe('SalesService.createReturn', () => {
+  it('throws NotFoundException for a saleItemId that does not belong to the sale', async () => {
+    const saleFindUnique = jest.fn().mockResolvedValue(buildSoldSale());
+    const { service } = buildService({ saleFindUnique });
+
+    await expect(
+      service.createReturn('sale-1', 'admin-1', { items: [{ saleItemId: 'not-real', quantity: 1 }] } as never),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('throws BadRequestException when the returned quantity exceeds the sold quantity', async () => {
+    const saleFindUnique = jest.fn().mockResolvedValue(buildSoldSale());
+    const { service } = buildService({ saleFindUnique });
+
+    await expect(
+      service.createReturn('sale-1', 'admin-1', { items: [{ saleItemId: 'item-1', quantity: 6 }] } as never),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('rejects a quantity that exceeds what remains after a previous return on the same line', async () => {
+    const previousReturn = { items: [{ saleItemId: 'item-1', quantity: 4 }] };
+    const saleFindUnique = jest.fn().mockResolvedValue(buildSoldSale({ returns: [previousReturn] }));
+    const { service } = buildService({ saleFindUnique });
+
+    // بيعت 5، أُرجعت 4 سابقاً، يتبقى 1 قابل للإرجاع — طلب إرجاع 2 يتجاوز المتبقي
+    await expect(
+      service.createReturn('sale-1', 'admin-1', { items: [{ saleItemId: 'item-1', quantity: 2 }] } as never),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('restocks the product and records a RETURN stock movement', async () => {
+    const saleFindUnique = jest.fn().mockResolvedValue(buildSoldSale());
+    const { service, tx } = buildService({ saleFindUnique });
+
+    await service.createReturn('sale-1', 'admin-1', { items: [{ saleItemId: 'item-1', quantity: 2 }] } as never);
+
+    expect(tx.product.update).toHaveBeenCalledWith({
+      where: { id: 'prod-1' },
+      data: { quantity: { increment: 2 } },
+    });
+    expect(tx.stockMovement.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ productId: 'prod-1', type: 'RETURN', quantity: 2 }) }),
+    );
+  });
+
+  it('decrements customer balance only when the original sale was CREDIT with a customer', async () => {
+    const saleFindUnique = jest
+      .fn()
+      .mockResolvedValue(buildSoldSale({ paymentMethod: 'CREDIT', customerId: 'cust-1' }));
+    const { service, tx } = buildService({ saleFindUnique });
+
+    await service.createReturn('sale-1', 'admin-1', { items: [{ saleItemId: 'item-1', quantity: 5 }] } as never);
+
+    // إرجاع الكمية بأكملها بدون خصم/ضريبة إضافيين على مستوى الاختبار = المبلغ المسترجع الكامل
+    expect(tx.customer.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'cust-1' }, data: { balance: { decrement: expect.any(Number) } } }),
+    );
+  });
+
+  it('does not touch the customer balance for a CASH sale', async () => {
+    const saleFindUnique = jest.fn().mockResolvedValue(buildSoldSale({ paymentMethod: 'CASH' }));
+    const { service, tx } = buildService({ saleFindUnique });
+
+    await service.createReturn('sale-1', 'admin-1', { items: [{ saleItemId: 'item-1', quantity: 1 }] } as never);
+
+    expect(tx.customer.update).not.toHaveBeenCalled();
+  });
+
+  it('splits the original sale discount/tax proportionally across the returned amount', async () => {
+    const saleFindUnique = jest.fn().mockResolvedValue(buildSoldSale());
+    const { service, tx } = buildService({ saleFindUnique });
+
+    // subtotal الفاتورة 75 (5×15)، خصم 10، ضريبة 10%. إرجاع سطرين (2×15=30) = 40% من subtotal
+    await service.createReturn('sale-1', 'admin-1', { items: [{ saleItemId: 'item-1', quantity: 2 }] } as never);
+
+    const call = (tx.saleReturn.create as jest.Mock).mock.calls[0][0];
+    expect(call.data.subtotal).toBeCloseTo(30);
+    expect(call.data.discountShare).toBeCloseTo(4); // 10 × 40%
+    expect(call.data.taxShare).toBeCloseTo(2.6); // (30 - 4) × 10%
+    expect(call.data.total).toBeCloseTo(28.6);
+  });
+});
+
+describe('SalesService.remove', () => {
+  it('throws BadRequestException when the sale already has returns recorded', async () => {
+    const saleFindUnique = jest.fn().mockResolvedValue(buildSoldSale({ returns: [{ items: [] }] }));
+    const { service } = buildService({ saleFindUnique });
+
+    await expect(service.remove('sale-1')).rejects.toBeInstanceOf(BadRequestException);
   });
 });

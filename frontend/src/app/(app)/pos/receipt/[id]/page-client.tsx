@@ -1,5 +1,6 @@
 'use client';
 
+import { useRef } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { Printer } from 'lucide-react';
@@ -9,6 +10,7 @@ import { fetchSale } from '@/lib/sales';
 import { fetchStoreSettings } from '@/lib/store-settings';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import { useRouteId } from '@/lib/use-route-id';
+import { printPage, useReceiptPaper } from '@/lib/print';
 import { useLocale } from '@/i18n/locale-provider';
 
 export default function ReceiptPage() {
@@ -16,6 +18,8 @@ export default function ReceiptPage() {
   const { t, locale } = useLocale();
   const { data: sale, isLoading } = useQuery({ queryKey: ['sale', id], queryFn: () => fetchSale(id) });
   const { data: settings } = useQuery({ queryKey: ['store-settings'], queryFn: fetchStoreSettings });
+  const paper = useReceiptPaper();
+  const ticketRef = useRef<HTMLDivElement>(null);
 
   if (isLoading) return <Skeleton className="mx-auto h-96 w-full max-w-2xl" />;
   if (!sale) return <p className="text-sm text-destructive">{t('sales.notFound')}</p>;
@@ -24,13 +28,13 @@ export default function ReceiptPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <style>{`@media print { @page { size: ${isLegal ? 'A4' : '80mm auto'}; margin: ${isLegal ? '12mm' : '2mm'}; } }`}</style>
+      <style>{`@media print { @page { size: ${isLegal ? 'A4' : `${paper}mm auto`}; margin: ${isLegal ? '12mm' : '2mm'}; } }`}</style>
 
       <div className="flex items-center justify-between print:hidden">
         <Link href="/pos" className={buttonVariants({ variant: 'outline' })}>
           {t('pos.newSaleLink')}
         </Link>
-        <button type="button" onClick={() => window.print()} className={buttonVariants({})}>
+        <button type="button" onClick={() => printPage(isLegal ? 'document' : 'receipt', ticketRef.current)} className={buttonVariants({})}>
           <Printer className="h-4 w-4" />
           {t('pos.printButton')}
         </button>
@@ -121,7 +125,12 @@ export default function ReceiptPage() {
           </div>
         </div>
       ) : (
-        <div className="mx-auto w-full max-w-xs rounded-xl border border-border bg-white p-4 font-mono text-xs text-black print:rounded-none print:border-0">
+        // عرض المحتوى أصغر قليلاً من عرض الورق (منطقة الطباعة الفعلية للطابعات الحرارية)
+        <div
+          ref={ticketRef}
+          style={{ width: paper === '58' ? '54mm' : '76mm' }}
+          className="mx-auto max-w-full rounded-xl border border-border bg-white p-4 font-mono text-xs text-black print:rounded-none print:border-0 print:p-1"
+        >
           <div className="text-center">
             <p className="text-sm font-bold">{settings?.name}</p>
             {settings?.address && <p>{settings.address}</p>}
