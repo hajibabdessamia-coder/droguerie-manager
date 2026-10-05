@@ -125,11 +125,14 @@ export default function ReceiptPage() {
           </div>
         </div>
       ) : (
-        // عرض المحتوى أصغر قليلاً من عرض الورق (منطقة الطباعة الفعلية للطابعات الحرارية)
+        // عرض المحتوى = منطقة الطباعة الفعلية لرأس الطابعة الحرارية (203dpi: 384 نقطة ≈ 48mm
+        // لورق 58mm، و576 نقطة ≈ 72mm لورق 80mm)؛ ما يتجاوزها يُقصّ على حافة الورق
         <div
           ref={ticketRef}
-          style={{ width: paper === '58' ? '54mm' : '76mm' }}
-          className="mx-auto max-w-full rounded-xl border border-border bg-white p-4 font-mono text-xs text-black print:rounded-none print:border-0 print:p-1"
+          style={{ width: paper === '58' ? '48mm' : '72mm' }}
+          className={`mx-auto max-w-full rounded-xl border border-border bg-white p-4 font-mono text-black print:rounded-none print:border-0 print:p-0 ${
+            paper === '58' ? 'text-[11px]' : 'text-xs'
+          }`}
         >
           <div className="text-center">
             <p className="text-sm font-bold">{settings?.name}</p>
@@ -145,7 +148,7 @@ export default function ReceiptPage() {
           <div className="my-2 border-t border-dashed border-gray-500" />
           {sale.items.map((item) => (
             <div key={item.id} className="flex justify-between gap-2">
-              <span className="truncate">
+              <span className="min-w-0 break-words">
                 {item.product?.name ?? item.productId} × {item.quantity}
               </span>
               <span className="shrink-0">{formatCurrency(item.total, locale)}</span>
