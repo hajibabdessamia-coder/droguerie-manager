@@ -42,8 +42,8 @@ function run(cmd, cwd, extraEnv) {
 
 try {
   run('npm prune --omit=dev', backendDir);
-  // PACK_TARGETS يسمح ببناء هدف واحد فقط (مثلاً nsis) — ضغط الـ zip يستهلك ذاكرة كبيرة
-  const targets = process.env.PACK_TARGETS || 'nsis zip';
+  // المثبّت (nsis) فقط افتراضياً؛ PACK_TARGETS يسمح بإضافة أهداف أخرى عند الحاجة (مثلاً "nsis zip")
+  const targets = process.env.PACK_TARGETS || 'nsis';
   run(`npx electron-builder --win ${targets}`, electronDir, {
     CSC_LINK: certPath,
     CSC_KEY_PASSWORD: process.env.CSC_KEY_PASSWORD,

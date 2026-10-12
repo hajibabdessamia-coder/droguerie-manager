@@ -65,8 +65,7 @@
     ],
     "win": {
       "target": [
-        "nsis",
-        "zip"
+        "nsis"
       ],
       "icon": "resources/icon.ico",
       "extraResources": [
