@@ -42,7 +42,9 @@ function run(cmd, cwd, extraEnv) {
 
 try {
   run('npm prune --omit=dev', backendDir);
-  run('npx electron-builder --win nsis zip', electronDir, {
+  // PACK_TARGETS يسمح ببناء هدف واحد فقط (مثلاً nsis) — ضغط الـ zip يستهلك ذاكرة كبيرة
+  const targets = process.env.PACK_TARGETS || 'nsis zip';
+  run(`npx electron-builder --win ${targets}`, electronDir, {
     CSC_LINK: certPath,
     CSC_KEY_PASSWORD: process.env.CSC_KEY_PASSWORD,
   });

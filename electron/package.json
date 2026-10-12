@@ -35,10 +35,6 @@
         "to": "backend"
       },
       {
-        "from": "../backend/node_modules",
-        "to": "backend/node_modules"
-      },
-      {
         "from": "../backend/prisma/schema.prisma",
         "to": "backend/prisma/schema.prisma"
       },
@@ -72,7 +68,17 @@
         "nsis",
         "zip"
       ],
-      "icon": "resources/icon.ico"
+      "icon": "resources/icon.ico",
+      "extraResources": [
+        {
+          "from": "../backend/node_modules",
+          "to": "backend/node_modules",
+          "filter": [
+            "**/*",
+            "!**/*.dylib.node"
+          ]
+        }
+      ]
     },
     "nsis": {
       "oneClick": false,
@@ -87,7 +93,13 @@
         "dmg"
       ],
       "icon": "resources/icon.icns",
-      "category": "public.app-category.business"
+      "category": "public.app-category.business",
+      "extraResources": [
+        {
+          "from": "../backend/node_modules",
+          "to": "backend/node_modules"
+        }
+      ]
     }
   }
 }
